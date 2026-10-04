@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion } from "@/components/motion";
 import { Bell, CheckCircle2, ChevronRight, CircleDollarSign, Globe2, Home, LayoutGrid, UserRound, WalletCards } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useState } from "react";
