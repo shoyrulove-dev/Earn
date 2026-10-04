@@ -32,4 +32,6 @@ body:has(form)::after { content: "A PureHub product  •  © 2026 Pure Earn"; di
 /* XenPaid-style centered member app shell: phone width on desktop, full width on mobile. */
 body:has(header.sticky) main > div { width: 100% !important; max-width: 646px !important; margin-inline: auto; }
 body:has(header.sticky) main > nav { width: 100%; max-width: 646px !important; left: 50%; transform: translateX(-50%); }
+main > div.max-w-5xl { max-width: 646px !important; }
+main > nav.max-w-5xl { max-width: 646px !important; left: 50%; transform: translateX(-50%); }
 @media (max-width: 646px) { body:has(header.sticky) main > div, body:has(header.sticky) main > nav { max-width: 100% !important; } }
