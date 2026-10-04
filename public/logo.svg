@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 160" role="img" aria-labelledby="title desc">
-  <title id="title">Pure Earn</title><desc id="desc">Logo nền tảng nhiệm vụ và phần thưởng Pure Earn</desc>
+  <title id="title">Pure Earn</title><desc id="desc">Pure Earn tasks and rewards platform logo</desc>
   <defs><linearGradient id="g" x1="20" y1="10" x2="140" y2="150"><stop stop-color="#a78bfa"/><stop offset="1" stop-color="#6d28d9"/></linearGradient></defs>
   <rect x="8" y="8" width="144" height="144" rx="42" fill="#09070f"/><path fill="url(#g)" d="M42 39h43c30 0 49 16 49 42 0 26-19 42-49 42H72v13H42V39Zm30 27v30h13c12 0 19-5 19-15 0-9-7-15-19-15H72Z"/><circle cx="121" cy="122" r="22" fill="#fbbf24"/>
   <text x="180" y="104" fill="#f8fafc" font-family="Arial,Helvetica,sans-serif" font-size="72" font-weight="800" letter-spacing="-3">Pure</text><text x="340" y="104" fill="#a78bfa" font-family="Arial,Helvetica,sans-serif" font-size="72" font-weight="800" letter-spacing="-3">Earn</text>
