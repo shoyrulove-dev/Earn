@@ -22,3 +22,7 @@
 html, body { min-height: 100%; background: #17112b; }
 body { color: #f8fafc; font-family: Arial, Helvetica, sans-serif; background: radial-gradient(circle at 50% 0%, #3a2461 0%, #17112b 48%, #100b1f 100%); }
 ::-webkit-scrollbar { width: 0; height: 0; }
+
+/* Keep the authenticated member experience phone-sized on desktop. */
+main > div.mx-auto.min-h-screen.max-w-5xl { width: 100%; max-width: 28rem; overflow: hidden; }
+main > nav.max-w-5xl { max-width: 28rem; }

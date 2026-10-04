@@ -1,0 +1,5 @@
+import { NextResponse } from "next/server";
+import bcrypt from "bcryptjs";
+import { connectDB } from "@/lib/mongodb";
+import User from "@/models/User";
+export async function POST(request: Request) { const { name, email, password } = await request.json(); if (!email || !password || password.length < 8) return NextResponse.json({ error: "Name, email and a password of at least 8 characters are required" }, { status: 400 }); await connectDB(); const normalized = String(email).toLowerCase().trim(); if (await User.exists({ email: normalized })) return NextResponse.json({ error: "An account with this email already exists" }, { status: 409 }); const passwordHash = await bcrypt.hash(password, 12); const user = await User.create({ name: name?.trim() || normalized.split("@")[0], email: normalized, passwordHash, role: process.env.ADMIN_EMAIL?.toLowerCase() === normalized ? "admin" : "user" }); return NextResponse.json({ user: { id: user.id, email: user.email, name: user.name } }, { status: 201 }); }
