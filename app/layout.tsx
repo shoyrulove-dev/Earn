@@ -26,7 +26,7 @@ export const metadata: Metadata = {
   category: "finance"
 };
 
-export const viewport = { themeColor: "#09070f", colorScheme: "dark" };
+export const viewport = { themeColor: "#211936", colorScheme: "dark" };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return <html lang="en" className="dark"><body>{children}</body></html>;
