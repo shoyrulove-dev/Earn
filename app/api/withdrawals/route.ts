@@ -1,0 +1,6 @@
+import { NextResponse } from "next/server";
+import { getAuthSession } from "@/lib/auth";
+import { connectDB } from "@/lib/mongodb";
+import User from "@/models/User";
+import Transaction from "@/models/Transaction";
+export async function POST(request: Request) { const session = await getAuthSession(); if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 }); const body = await request.json(); const amount = Number(body.amount); if (!Number.isFinite(amount) || amount < 5 || !body.method || !body.account) return NextResponse.json({ error: "Minimum withdrawal is $5 and method/account are required" }, { status: 400 }); await connectDB(); const user = await User.findOneAndUpdate({ _id: session.user.id, balance: { $gte: amount } }, { $inc: { balance: -amount, pendingBalance: amount } }, { new: true }); if (!user) return NextResponse.json({ error: "Insufficient available balance" }, { status: 400 }); await Transaction.create({ userId: user._id, type: "withdrawal", amount: -amount, status: "pending", source: body.method, reference: `withdrawal:${user._id}:${Date.now()}`, metadata: { account: String(body.account).slice(0, 200) } }); return NextResponse.json({ ok: true, balance: user.balance, pendingBalance: user.pendingBalance }); }
