@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import { Bell, CheckCircle2, ChevronRight, CircleDollarSign, Home, LayoutGrid, UserRound, WalletCards } from "lucide-react";
+import Image from "next/image";
 import { useState } from "react";
 
 const offers = [
@@ -18,7 +19,7 @@ export default function HomePage() {
   return <main className="mx-auto h-screen w-full max-w-md overflow-hidden bg-ink shadow-2xl shadow-violet-950/20">
     <div className="h-full overflow-y-auto pb-24">
       <header className="sticky top-0 z-10 flex items-center justify-between border-b border-white/5 bg-ink/90 px-5 py-4 backdrop-blur-xl">
-        <div className="flex items-center gap-3"><div className="grid h-10 w-10 place-items-center rounded-2xl bg-neon font-black text-white shadow-glow">PE</div><div><p className="text-xs text-slate-400">Chào buổi sáng,</p><p className="font-semibold">Minh Anh <span className="text-neon">✦</span></p></div></div>
+        <div className="flex items-center gap-3"><Image src="/icon.svg" alt="Pure Earn" width={40} height={40} priority className="rounded-2xl shadow-glow"/><div><p className="text-xs text-slate-400">Chào buổi sáng,</p><p className="font-semibold">Minh Anh <span className="text-neon">✦</span></p></div></div>
         <button className="relative rounded-full border border-white/10 p-2.5 text-slate-300"><Bell size={19}/><span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-neon"/></button>
       </header>
       <section className="px-5 pt-6"><p className="mb-2 text-sm text-slate-400">Số dư khả dụng</p><div className="flex items-end justify-between"><div><motion.p key={balance} initial={{ opacity: .3, y: 8 }} animate={{ opacity: 1, y: 0 }} className="text-4xl font-bold tracking-tight">${balance.toFixed(2)}</motion.p><p className="mt-2 flex items-center gap-1 text-xs text-emerald-400"><CheckCircle2 size={13}/> +$4.20 tuần này</p></div><button onClick={() => setBalance((v) => v + .5)} className="rounded-xl bg-neon px-3 py-2 text-xs font-bold text-ink shadow-glow">+ Test reward</button></div></section>
