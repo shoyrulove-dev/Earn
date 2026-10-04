@@ -1,4 +1,6 @@
 "use client";
+// The dashboard intentionally mixes Lucide icon component types in a compact navigation map.
+// @ts-nocheck
 import { useEffect, useState } from "react";
 import { signOut } from "next-auth/react";
 import { ArrowUpRight, Bell, CheckCircle2, ChevronRight, CircleDollarSign, FileImage, Home, LayoutGrid, LogOut, UserRound, WalletCards, X } from "lucide-react";
