@@ -1,0 +1,3 @@
+"use client";
+import Link from "next/link";
+export default function DashboardPage() { return <main className="min-h-screen bg-[#17112b] p-6 text-white"><div className="mx-auto max-w-md rounded-3xl border border-violet-200/15 bg-[#211936] p-6 shadow-2xl"><p className="text-sm text-violet-200">Pure Earn dashboard</p><h1 className="mt-3 text-3xl font-black">Your earning space</h1><p className="mt-3 text-slate-300">Your account is ready. Task feeds and wallet details will appear here once you start earning.</p><Link href="/" className="mt-6 inline-flex rounded-xl bg-violet-400 px-4 py-3 font-bold">Back to home</Link></div></main>; }
