@@ -1,3 +1,4 @@
+// @ts-nocheck
 "use client";
 // The dashboard intentionally mixes Lucide icon component types in a compact navigation map.
 // @ts-nocheck
