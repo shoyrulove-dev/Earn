@@ -27,7 +27,7 @@ body { color: #f8fafc; font-family: Arial, Helvetica, sans-serif; background: ra
 main > div.mx-auto.min-h-screen.max-w-5xl { width: 100%; max-width: 28rem; overflow: hidden; }
 main > nav.max-w-5xl { max-width: 28rem; }
 
-body:has(form)::after { content: "A PureHub product  •  © 2026 Pure Earn"; display: block; padding: 2rem 1rem; text-align: center; color: #a8a0bc; font-size: .8rem; border-top: 1px solid rgba(255,255,255,.1); }
+body:has(form)::after { content: "A PureHub Product  •  © 2026 Pure Earn"; display: block; padding: 2rem 1rem; text-align: center; color: #a8a0bc; font-size: .8rem; border-top: 1px solid rgba(255,255,255,.1); }
 
 /* XenPaid-style centered member app shell: phone width on desktop, full width on mobile. */
 body:has(header.sticky) main > div { width: 100% !important; max-width: 646px !important; margin-inline: auto; }
