@@ -1,0 +1,2 @@
+"use client";
+export default function GlobalError({ reset }: { reset: () => void }) { return <main className="grid min-h-screen place-items-center bg-[#17112b] px-6 text-center text-white"><div><p className="text-sm uppercase tracking-[.2em] text-violet-300">Pure Earn</p><h1 className="mt-3 text-2xl font-bold">Something went wrong</h1><p className="mt-2 text-slate-400">Please reload the page and try again.</p><button onClick={() => reset()} className="mt-6 rounded-xl bg-violet-400 px-5 py-3 font-bold">Reload dashboard</button></div></main>; }
