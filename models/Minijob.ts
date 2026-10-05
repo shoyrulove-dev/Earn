@@ -1,3 +1,3 @@
 import mongoose, { Schema, models } from "mongoose";
-const MinijobSchema = new Schema({ title: { type: String, required: true }, description: String, source: { type: String, default: "MINIJOB" }, reward: { type: Number, required: true }, icon: String, tags: [String], active: { type: Boolean, default: true }, proofRequired: { type: Boolean, default: true } }, { timestamps: true });
+const MinijobSchema = new Schema({ title: { type: String, required: true }, slug: { type: String, unique: true, sparse: true }, description: String, source: { type: String, default: "MINIJOB" }, externalUrl: String, reward: { type: Number, required: true }, rewardCurrency: { type: String, enum: ["USD", "PHT"], default: "USD" }, icon: String, tags: [String], active: { type: Boolean, default: true }, proofRequired: { type: Boolean, default: true } }, { timestamps: true });
 export default models.Minijob || mongoose.model("Minijob", MinijobSchema);
