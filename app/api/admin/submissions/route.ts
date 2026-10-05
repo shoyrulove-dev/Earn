@@ -1,3 +1,117 @@
-import{NextResponse}from"next/server";import{getAuthSession}from"@/lib/auth";import{connectDB}from"@/lib/mongodb";import Submission from"@/models/Submission";import OfferProof from"@/models/OfferProof";import User from"@/models/User";import Transaction from"@/models/Transaction";
-export async function GET(){const s=await getAuthSession();if(s?.user?.role!=="admin")return NextResponse.json({error:"Forbidden"},{status:403});await connectDB();const[jobs,offers]=await Promise.all([Submission.find({status:"pending"}).populate("userId minijobId").sort({createdAt:1}).lean(),OfferProof.find({status:"pending"}).populate("userId","email name").sort({createdAt:1}).lean()]);return NextResponse.json({submissions:[...jobs,...offers.map(x=>({...x,_id:`offer:${x._id}`,minijobId:{title:`Partner proof: ${x.campaignName||x.campaignId}`}}))]});}
-export async function PATCH(request:Request){const s=await getAuthSession();if(s?.user?.role!=="admin")return NextResponse.json({error:"Forbidden"},{status:403});const{id,status,reviewNote}=await request.json();if(!id||!["approved","rejected"].includes(status))return NextResponse.json({error:"Invalid review"},{status:400});await connectDB();if(String(id).startsWith("offer:")){const proof=await OfferProof.findOneAndUpdate({_id:String(id).slice(6),status:"pending"},{$set:{status,reviewNote,reviewedBy:s.user.id,reviewedAt:new Date()}},{new:true});if(!proof)return NextResponse.json({error:"Proof already reviewed or not found"},{status:404});return NextResponse.json({submission:proof});}const submission=await Submission.findOne({_id:id,status:"pending"}).populate("minijobId");if(!submission)return NextResponse.json({error:"Submission already reviewed or not found"},{status:404});submission.status=status;submission.reviewNote=reviewNote;submission.reviewedBy=s.user.id as never;submission.reviewedAt=new Date();await submission.save();if(status==="approved"){const job=submission.minijobId as unknown as{reward?:number;rewardCurrency?:string};const raw=Number(job?.reward||0),reward=job?.rewardCurrency==="PHT"?Math.floor(raw):Math.floor(raw*1000);if(reward>0){await User.findByIdAndUpdate(submission.userId,{$inc:{phtBalance:reward}});await Transaction.create({userId:submission.userId,type:"earning",currency:"PHT",amount:reward,status:"approved",source:"minijob",reference:`minijob:${submission._id}`,metadata:{submissionId:submission._id}});}}return NextResponse.json({submission});}
+import { NextResponse } from "next/server";
+import { getAuthSession } from "@/lib/auth";
+import { connectDB } from "@/lib/mongodb";
+import Submission from "@/models/Submission";
+import OfferProof from "@/models/OfferProof";
+import User from "@/models/User";
+import Transaction from "@/models/Transaction";
+import { tierFor, vipLevelFor } from "@/lib/pht";
+export async function GET() {
+  const s = await getAuthSession();
+  if (s?.user?.role !== "admin")
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  await connectDB();
+  const [jobs, offers] = await Promise.all([
+    Submission.find({ status: "pending" })
+      .populate("userId minijobId")
+      .sort({ createdAt: 1 })
+      .lean(),
+    OfferProof.find({ status: "pending" })
+      .populate("userId", "email name")
+      .sort({ createdAt: 1 })
+      .lean(),
+  ]);
+  return NextResponse.json({
+    submissions: [
+      ...jobs,
+      ...offers.map((x) => ({
+        ...x,
+        _id: `offer:${x._id}`,
+        minijobId: {
+          title: `Partner proof: ${x.campaignName || x.campaignId}`,
+        },
+      })),
+    ],
+  });
+}
+export async function PATCH(request: Request) {
+  const s = await getAuthSession();
+  if (s?.user?.role !== "admin")
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const { id, status, reviewNote } = await request.json();
+  if (!id || !["approved", "rejected"].includes(status))
+    return NextResponse.json({ error: "Invalid review" }, { status: 400 });
+  await connectDB();
+  if (String(id).startsWith("offer:")) {
+    const proof = await OfferProof.findOneAndUpdate(
+      { _id: String(id).slice(6), status: "pending" },
+      {
+        $set: {
+          status,
+          reviewNote,
+          reviewedBy: s.user.id,
+          reviewedAt: new Date(),
+        },
+      },
+      { new: true },
+    );
+    if (!proof)
+      return NextResponse.json(
+        { error: "Proof already reviewed or not found" },
+        { status: 404 },
+      );
+    return NextResponse.json({ submission: proof });
+  }
+  const submission = await Submission.findOne({
+    _id: id,
+    status: "pending",
+  }).populate("minijobId");
+  if (!submission)
+    return NextResponse.json(
+      { error: "Submission already reviewed or not found" },
+      { status: 404 },
+    );
+  submission.status = status;
+  submission.reviewNote = reviewNote;
+  submission.reviewedBy = s.user.id as never;
+  submission.reviewedAt = new Date();
+  await submission.save();
+  if (status === "approved") {
+    const job = submission.minijobId as unknown as {
+      reward?: number;
+      rewardCurrency?: string;
+    };
+    const raw = Number(job?.reward || 0),
+      base =
+        job?.rewardCurrency === "PHT"
+          ? Math.floor(raw)
+          : Math.floor(raw * 1000),
+      u = await User.findById(submission.userId).select("totalEarnedPht");
+    const reward = Math.floor(
+      base * (1 + tierFor(Number(u?.totalEarnedPht || 0)).bonusRate),
+    );
+    if (reward > 0) {
+      const updated = await User.findByIdAndUpdate(
+        submission.userId,
+        { $inc: { phtBalance: reward, totalEarnedPht: reward } },
+        { new: true },
+      );
+      if (updated) {
+        updated.vipLevel = vipLevelFor(updated.totalEarnedPht);
+        updated.vipInitialized = true;
+        await updated.save();
+      }
+      await Transaction.create({
+        userId: submission.userId,
+        type: "earning",
+        currency: "PHT",
+        amount: reward,
+        status: "approved",
+        source: "minijob",
+        reference: `minijob:${submission._id}`,
+        metadata: { submissionId: submission._id },
+      });
+    }
+  }
+  return NextResponse.json({ submission });
+}

@@ -5,8 +5,140 @@ import AppSetting from "@/models/AppSetting";
 import BingXSubmission from "@/models/BingXSubmission";
 import Transaction from "@/models/Transaction";
 import User from "@/models/User";
+import { tierFor } from "@/lib/pht";
 
-async function admin(){const session=await getAuthSession();return session?.user?.role==="admin"?session:null;}
-export async function GET(){if(!await admin())return NextResponse.json({error:"Forbidden"},{status:403});await connectDB();const[setting,submissions]=await Promise.all([AppSetting.findOne({key:"bingx"}).lean(),BingXSubmission.find({status:"pending"}).populate("userId","email name userId").sort({createdAt:1}).lean()]);return NextResponse.json({config:(setting as {value?:unknown}|null)?.value||{},submissions});}
-export async function PUT(request:Request){if(!await admin())return NextResponse.json({error:"Forbidden"},{status:403});const body=await request.json();const value={affiliateId:String(body.affiliateId||"").trim(),affiliateUrl:String(body.affiliateUrl||"").trim(),active:Boolean(body.active&&body.affiliateUrl),autoAnnounce:Boolean(body.autoAnnounce),rewardPht:Math.max(0,Math.floor(Number(body.rewardPht||100))),holdDays:Math.max(1,Math.floor(Number(body.holdDays||7))),mysteryBox:String(body.mysteryBox||"Mystery Box worth at least 5 USDT for eligible new users").trim()};if(value.affiliateUrl){try{new URL(value.affiliateUrl)}catch{return NextResponse.json({error:"Invalid affiliate URL"},{status:400});}}await connectDB();const previous=await AppSetting.findOne({key:"bingx"}).lean() as {value?:{active?:boolean;affiliateUrl?:string}}|null;await AppSetting.findOneAndUpdate({key:"bingx"},{$set:{value}},{upsert:true,new:true});let announced=false;if(value.active&&value.autoAnnounce&&(!previous?.value?.active||previous.value.affiliateUrl!==value.affiliateUrl)){const token=process.env.TELEGRAM_BOT_TOKEN,chat_id=process.env.TELEGRAM_NEWS_CHAT_ID||"-1004353318290";if(token){const response=await fetch(`https://api.telegram.org/bot${token}/sendMessage`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({chat_id,text:`🎁 BingX Tier 1 is live\n\nComplete registration and verified KYC to receive ${value.rewardPht} PHT from Pure Earn. Eligible new BingX users may also receive: ${value.mysteryBox}.\n\nOpen Pure Earn → Offers to participate.`,disable_web_page_preview:false})});announced=response.ok;}}return NextResponse.json({ok:true,config:value,announced});}
-export async function PATCH(request:Request){const session=await admin();if(!session)return NextResponse.json({error:"Forbidden"},{status:403});const{id,status,reviewNote}=await request.json();if(!id||!["approved","rejected"].includes(status))return NextResponse.json({error:"Invalid review"},{status:400});await connectDB();const submission=await BingXSubmission.findOne({_id:id,status:"pending"});if(!submission)return NextResponse.json({error:"Already reviewed or not found"},{status:404});submission.status=status;submission.reviewNote=String(reviewNote||"");submission.reviewedBy=session.user.id as never;submission.reviewedAt=new Date();if(status==="approved"){submission.releaseAt=new Date(Date.now()+submission.holdDays*86400000);await User.findByIdAndUpdate(submission.userId,{$inc:{pendingPht:submission.rewardPht}});await Transaction.create({userId:submission.userId,type:"earning",currency:"PHT",amount:submission.rewardPht,status:"pending",availableAt:submission.releaseAt,source:"bingx-tier-1",reference:`bingx:tier1:${submission._id}`,metadata:{bingxUid:submission.bingxUid,kycVerified:true,holdDays:submission.holdDays}});}await submission.save();return NextResponse.json({ok:true,submission});}
+async function admin() {
+  const session = await getAuthSession();
+  return session?.user?.role === "admin" ? session : null;
+}
+export async function GET() {
+  if (!(await admin()))
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  await connectDB();
+  const [setting, submissions] = await Promise.all([
+    AppSetting.findOne({ key: "bingx" }).lean(),
+    BingXSubmission.find({ status: "pending" })
+      .populate("userId", "email name userId")
+      .sort({ createdAt: 1 })
+      .lean(),
+  ]);
+  return NextResponse.json({
+    config: (setting as { value?: unknown } | null)?.value || {},
+    submissions,
+  });
+}
+export async function PUT(request: Request) {
+  if (!(await admin()))
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const body = await request.json();
+  const value = {
+    affiliateId: String(body.affiliateId || "").trim(),
+    affiliateUrl: String(body.affiliateUrl || "").trim(),
+    active: Boolean(body.active && body.affiliateUrl),
+    autoAnnounce: Boolean(body.autoAnnounce),
+    rewardPht: Math.max(0, Math.floor(Number(body.rewardPht || 100))),
+    holdDays: Math.max(1, Math.floor(Number(body.holdDays || 7))),
+    mysteryBox: String(
+      body.mysteryBox ||
+        "Mystery Box worth at least 5 USDT for eligible new users",
+    ).trim(),
+  };
+  if (value.affiliateUrl) {
+    try {
+      new URL(value.affiliateUrl);
+    } catch {
+      return NextResponse.json(
+        { error: "Invalid affiliate URL" },
+        { status: 400 },
+      );
+    }
+  }
+  await connectDB();
+  const previous = (await AppSetting.findOne({ key: "bingx" }).lean()) as {
+    value?: { active?: boolean; affiliateUrl?: string };
+  } | null;
+  await AppSetting.findOneAndUpdate(
+    { key: "bingx" },
+    { $set: { value } },
+    { upsert: true, new: true },
+  );
+  let announced = false;
+  if (
+    value.active &&
+    value.autoAnnounce &&
+    (!previous?.value?.active ||
+      previous.value.affiliateUrl !== value.affiliateUrl)
+  ) {
+    const token = process.env.TELEGRAM_BOT_TOKEN,
+      chat_id = process.env.TELEGRAM_NEWS_CHAT_ID || "-1004353318290";
+    if (token) {
+      const response = await fetch(
+        `https://api.telegram.org/bot${token}/sendMessage`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            chat_id,
+            text: `🎁 BingX Tier 1 is live\n\nComplete registration and verified KYC to receive ${value.rewardPht} PHT from Pure Earn. Eligible new BingX users may also receive: ${value.mysteryBox}.\n\nOpen Pure Earn → Offers to participate.`,
+            disable_web_page_preview: false,
+          }),
+        },
+      );
+      announced = response.ok;
+    }
+  }
+  return NextResponse.json({ ok: true, config: value, announced });
+}
+export async function PATCH(request: Request) {
+  const session = await admin();
+  if (!session)
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const { id, status, reviewNote } = await request.json();
+  if (!id || !["approved", "rejected"].includes(status))
+    return NextResponse.json({ error: "Invalid review" }, { status: 400 });
+  await connectDB();
+  const submission = await BingXSubmission.findOne({
+    _id: id,
+    status: "pending",
+  });
+  if (!submission)
+    return NextResponse.json(
+      { error: "Already reviewed or not found" },
+      { status: 404 },
+    );
+  submission.status = status;
+  submission.reviewNote = String(reviewNote || "");
+  submission.reviewedBy = session.user.id as never;
+  submission.reviewedAt = new Date();
+  if (status === "approved") {
+    const user = await User.findById(submission.userId).select("totalEarnedPht");
+    const rewardPht = Math.floor(
+      Number(submission.rewardPht) *
+        (1 + tierFor(Number(user?.totalEarnedPht || 0)).bonusRate),
+    );
+    submission.releaseAt = new Date(
+      Date.now() + submission.holdDays * 86400000,
+    );
+    await User.findByIdAndUpdate(submission.userId, {
+      $inc: { pendingPht: rewardPht },
+    });
+    await Transaction.create({
+      userId: submission.userId,
+      type: "earning",
+      currency: "PHT",
+      amount: rewardPht,
+      status: "pending",
+      availableAt: submission.releaseAt,
+      source: "bingx-tier-1",
+      reference: `bingx:tier1:${submission._id}`,
+      metadata: {
+        bingxUid: submission.bingxUid,
+        kycVerified: true,
+        holdDays: submission.holdDays,
+        baseRewardPht: submission.rewardPht,
+      },
+    });
+  }
+  await submission.save();
+  return NextResponse.json({ ok: true, submission });
+}
