@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getAuthSession } from "@/lib/auth";
 import { connectDB } from "@/lib/mongodb";
 import User from "@/models/User";
+import { ensureUserIdentity } from "@/lib/user-identity";
 
 const locales = ["en", "vi", "zh", "es"];
 function localeFor(country: string) { return country === "VN" ? "vi" : country === "CN" ? "zh" : country === "ES" ? "es" : "en"; }
@@ -13,6 +14,7 @@ export async function GET(request: Request) {
   const detected = String(request.headers.get("x-vercel-ip-country") || "OTHER").toUpperCase();
   let user = await User.findOne({ email: session.user.email.toLowerCase() });
   if (user && !user.country) { user.country = detected; user.locale = localeFor(detected); await user.save(); }
+  if (user) { await ensureUserIdentity(user); user = await User.findById(user._id); }
   return NextResponse.json({ user: user?.toObject() });
 }
 

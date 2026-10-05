@@ -1,0 +1,5 @@
+{
+  "crons": [
+    { "path": "/api/cron/settle-pht", "schedule": "15 0 * * *" }
+  ]
+}

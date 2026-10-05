@@ -23,14 +23,10 @@ body { color: #f8fafc; font-family: Arial, Helvetica, sans-serif; background: ra
 button, a { -webkit-tap-highlight-color: transparent; }
 .field { width: 100%; border-radius: .75rem; border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.05); padding: .75rem 1rem; color: white; outline: none; }
 .field:focus { border-color: rgb(196 181 253); }
+.card { border: 1px solid rgba(255,255,255,.08); border-radius: 1rem; background: rgba(255,255,255,.04); padding: .8rem; }
+.icon { display: grid; width: 2.75rem; height: 2.75rem; flex: 0 0 auto; place-items: center; border-radius: .85rem; }
+.icon svg { width: 1.15rem; height: 1.15rem; }
+.round { display: grid; width: 2.5rem; height: 2.5rem; place-items: center; border-radius: 9999px; border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.04); }
 ::-webkit-scrollbar { width: 0; height: 0; }
 
 body:has(form)::after { content: "A PureHub Product • © 2026 Pure Earn"; display: block; padding: 2rem 1rem; text-align: center; color: #a8a0bc; font-size: .8rem; border-top: 1px solid rgba(255,255,255,.1); }
-
-/* Authenticated pages stay phone-sized on desktop and full-width on mobile. */
-body:has(header.sticky) main > div { width: 100% !important; max-width: 430px !important; margin-inline: auto; }
-body:has(header.sticky) main > nav { width: 100%; max-width: 430px !important; left: 50%; transform: translateX(-50%); }
-@media (max-width: 430px) {
-  body:has(header.sticky) main > div,
-  body:has(header.sticky) main > nav { max-width: 100% !important; }
-}
