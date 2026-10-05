@@ -108,7 +108,7 @@ function WalletView({user,txs,t,nav}:{user:User|null;txs:Tx[];t:Words;nav:(s:Scr
       {method==="BANK_VN"&&<><input className="field mt-2" value={bankName} onChange={e=>setBankName(e.target.value)} placeholder={pc.bankName}/><input className="field mt-2" value={accountName} onChange={e=>setAccountName(e.target.value)} placeholder={pc.holder}/><input className="field mt-2" value={account} onChange={e=>setAccount(e.target.value)} placeholder={pc.account}/></>}
       {method==="MOMO"&&<><input className="field mt-2" value={accountName} onChange={e=>setAccountName(e.target.value)} placeholder={pc.holder}/><input className="field mt-2" inputMode="tel" value={account} onChange={e=>setAccount(e.target.value)} placeholder={pc.phone}/></>}
       {method==="USDT_BSC"&&<><input className="field mt-2" value={account} onChange={e=>setAccount(e.target.value)} placeholder={pc.address}/><p className="mt-2 rounded-xl bg-amber-300/10 p-2 text-[11px] leading-4 text-amber-200">{pc.bscNote}</p></>}
-      {method==="LTC"&&<input className="field mt-2" value={account} onChange={e=>setAccount(e.target.value)} placeholder={t.accountAddress}/>} 
+      {method==="LTC"&&<input className="field mt-2" value={account} onChange={e=>setAccount(e.target.value)} placeholder={t.accountAddress}/>}
       <button onClick={send} className="mt-3 w-full rounded-xl bg-violet-500 p-3 text-sm font-bold">{t.request}</button>{msg&&<p className="mt-2 text-xs text-violet-200">{msg}</p>}<button onClick={()=>nav("Guide")} className="mt-3 w-full text-xs underline">{t.guide}</button>
     </section><Title e="PHT" n={t.recent}/><TransactionList txs={txs.slice(0,8)} locale={user?.locale}/>
   </>
