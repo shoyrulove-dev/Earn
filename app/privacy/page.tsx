@@ -1,25 +1,5 @@
+import LegalContentPage from "@/components/legal-content-page";
+
 export default function Privacy() {
-  return (
-    <main className="legal">
-      <article>
-        <p className="eyebrow">PURE EARN · PRIVACY</p>
-        <h1>Privacy Policy</h1>
-        <p>Last updated: October 5, 2026. Pure Earn, a PureHub Product, processes only information needed to operate accounts, validate offers, prevent fraud and process withdrawals.</p>
-        <h2>Information we collect</h2>
-        <p>Account identity, country, language, member ID, reward history, withdrawal details, offer click identifiers, proof links, device identifiers and security logs. We never request passwords, OTP codes, seed phrases or private keys as proof.</p>
-        <h2>How information is used</h2>
-        <p>We use data to authenticate users, localize campaigns, attribute conversions, calculate PHT, review disputes, prevent duplicate accounts and process cash-outs.</p>
-        <h2>Sharing and retention</h2>
-        <p>Tracking identifiers may be sent to offer partners. We do not sell personal information. Records are retained only as long as operational, dispute, fraud-prevention and legal obligations require.</p>
-        <h2>Your choices</h2>
-        <p>Request correction or deletion, subject to anti-fraud and accounting retention, at admin@blissbiovn.com.</p>
-        <Nav />
-      </article>
-    </main>
-  );
+  return <LegalContentPage kind="privacy" />;
 }
-
-function Nav() {
-  return <nav className="legal-nav"><a href="/">Home</a><a href="/terms">Terms</a><a href="/faq">FAQ</a><a href="/support">Support</a></nav>;
-}
-
