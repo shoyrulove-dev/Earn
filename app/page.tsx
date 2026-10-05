@@ -70,7 +70,7 @@ export default function LandingPage() {
         <section className="grid items-center gap-10 py-8 md:grid-cols-[1.05fr_.95fr] md:py-16">
           <div>
             <span className="inline-flex items-center gap-2 rounded-full border border-violet-300/25 bg-violet-300/10 px-4 py-2 text-xs"><Sparkles size={14}/>{t.tag}</span>
-            <h1 className="mt-6 text-5xl font-black leading-[1.06] tracking-[-.035em] md:text-7xl">{t.title}</h1>
+            <h1 className="mt-6 max-w-[650px] text-4xl font-black leading-[1.08] tracking-[-.025em] sm:text-5xl md:text-6xl">{t.title}</h1>
             <p className="mt-6 max-w-xl text-lg leading-8 text-slate-300">{t.intro}</p>
             <div className="mt-7 flex gap-5 text-sm"><span className="flex gap-2"><CheckCircle2 className="text-emerald-300" size={17}/>{t.free}</span><span className="flex gap-2"><LockKeyhole className="text-violet-300" size={17}/>{t.secure}</span></div>
           </div>

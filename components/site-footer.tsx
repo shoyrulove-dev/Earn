@@ -6,10 +6,10 @@ import { usePathname } from "next/navigation";
 type Locale = "en" | "vi" | "zh" | "es";
 
 const footerCopy = {
-  en: { terms: "Terms of Service", privacy: "Privacy Policy", faq: "FAQ", support: "Support", product: "A PureHub Product" },
-  vi: { terms: "Điều khoản dịch vụ", privacy: "Chính sách bảo mật", faq: "Câu hỏi thường gặp", support: "Hỗ trợ", product: "Một sản phẩm của PureHub" },
-  zh: { terms: "服务条款", privacy: "隐私政策", faq: "常见问题", support: "客户支持", product: "PureHub 旗下产品" },
-  es: { terms: "Términos del servicio", privacy: "Política de privacidad", faq: "Preguntas frecuentes", support: "Soporte", product: "Un producto de PureHub" },
+  en: { terms: "Terms of Service", privacy: "Privacy Policy", faq: "FAQ", support: "Support", news:"News", community:"Community", product: "A PureHub Product" },
+  vi: { terms: "Điều khoản dịch vụ", privacy: "Chính sách bảo mật", faq: "Câu hỏi thường gặp", support: "Hỗ trợ", news:"Tin tức", community:"Cộng đồng", product: "Một sản phẩm của PureHub" },
+  zh: { terms: "服务条款", privacy: "隐私政策", faq: "常见问题", support: "客户支持", news:"资讯", community:"社区", product: "PureHub 旗下产品" },
+  es: { terms: "Términos del servicio", privacy: "Política de privacidad", faq: "Preguntas frecuentes", support: "Soporte", news:"Noticias", community:"Comunidad", product: "Un producto de PureHub" },
 };
 
 export default function SiteFooter() {
@@ -36,6 +36,8 @@ export default function SiteFooter() {
       <a href="/privacy">{t.privacy}</a>
       <a href="/faq">{t.faq}</a>
       <a href="/support">{t.support}</a>
+      <a href="https://t.me/pureearnglobal" target="_blank" rel="noreferrer">{t.news}</a>
+      <a href="https://t.me/pureearngroup" target="_blank" rel="noreferrer">{t.community}</a>
       <span>{t.product} · © 2026</span>
     </footer>
   );

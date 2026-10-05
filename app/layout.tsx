@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import SiteFooter from "@/components/site-footer";
-import { Be_Vietnam_Pro } from "next/font/google";
+import { Source_Sans_3 } from "next/font/google";
 
-const beVietnamPro = Be_Vietnam_Pro({
+const sourceSans = Source_Sans_3({
   subsets: ["latin", "vietnamese"],
   weight: ["400", "500", "600", "700", "800", "900"],
   display: "swap",
-  variable: "--font-be-vietnam-pro",
+  variable: "--font-source-sans",
 });
 
 const siteUrl = process.env.NEXT_PUBLIC_APP_URL || "https://earn.blissbiovn.com";
@@ -38,5 +38,5 @@ export const metadata: Metadata = {
 export const viewport = { themeColor: "#211936", colorScheme: "dark" };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="en" className={`dark ${beVietnamPro.variable}`}><body>{children}<SiteFooter/></body></html>;
+  return <html lang="en" className={`dark ${sourceSans.variable}`}><body>{children}<SiteFooter/></body></html>;
 }
