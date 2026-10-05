@@ -15,6 +15,7 @@ const UserSchema = new Schema(
     image: String,
     passwordHash: String,
     country: { type: String, uppercase: true, trim: true },
+    countryName: { type: String, trim: true, maxlength: 80 },
     locale: { type: String, enum: ["en", "vi", "zh", "es"], default: "en" },
     paymentAccounts: { type: Schema.Types.Mixed, default: {} },
     phtBalance: { type: Number, default: 0 },

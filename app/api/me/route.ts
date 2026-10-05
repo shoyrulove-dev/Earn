@@ -5,6 +5,7 @@ import User from "@/models/User";
 import { ensureUserIdentity } from "@/lib/user-identity";
 import Transaction from "@/models/Transaction";
 import { vipLevelFor } from "@/lib/pht";
+import { normalizeCountry } from "@/lib/countries";
 
 const locales = ["en", "vi", "zh", "es"];
 function localeFor(country: string) {
@@ -64,8 +65,15 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const body = await request.json();
   const changes: Record<string, unknown> = {};
-  if (body.country)
-    changes.country = String(body.country).toUpperCase().slice(0, 2);
+  if (body.country) {
+    changes.country = normalizeCountry(body.country);
+    changes.countryName =
+      changes.country === "OTHER"
+        ? String(body.countryName || "")
+            .trim()
+            .slice(0, 80)
+        : "";
+  }
   if (locales.includes(body.locale)) changes.locale = body.locale;
   if (body.paymentAccounts && typeof body.paymentAccounts === "object")
     changes.paymentAccounts = body.paymentAccounts;

@@ -4,6 +4,7 @@ import Image from "next/image";
 import { signIn } from "next-auth/react";
 import { useEffect, useState } from "react";
 import { ArrowRight, CheckCircle2, LockKeyhole, Sparkles } from "lucide-react";
+import { countryOptions, normalizeCountry } from "@/lib/countries";
 
 const words = {
   en: {
@@ -93,6 +94,7 @@ export default function LandingPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [country, setCountry] = useState("OTHER");
+  const [countryName, setCountryName] = useState("");
   const [locale, setLocale] = useState<Locale>("en");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -109,7 +111,7 @@ export default function LandingPage() {
     fetch("/api/locale")
       .then((r) => r.json())
       .then((x) => {
-        setCountry(x.country || "OTHER");
+        setCountry(normalizeCountry(x.country));
         const saved = localStorage.getItem("pureearn_locale") as Locale | null;
         changeLocale(
           saved && saved in words ? saved : ((x.locale || "en") as Locale),
@@ -132,6 +134,7 @@ export default function LandingPage() {
           email,
           password,
           country,
+          countryName,
           locale,
           referralCode: new URLSearchParams(location.search).get("ref"),
         }),
@@ -240,12 +243,27 @@ export default function LandingPage() {
                       onChange={(e) => setCountry(e.target.value)}
                       className="field mt-1"
                     >
-                      <option value="VN">Vietnam</option>
-                      <option value="US">United States</option>
-                      <option value="CN">China</option>
-                      <option value="ES">Spain</option>
+                      {countryOptions(locale).map((item) => (
+                        <option key={item.code} value={item.code}>
+                          {item.name}
+                        </option>
+                      ))}
                       <option value="OTHER">Other</option>
                     </select>
+                    {country === "OTHER" && (
+                      <input
+                        required
+                        value={countryName}
+                        onChange={(e) => setCountryName(e.target.value)}
+                        placeholder={
+                          locale === "vi"
+                            ? "Nhập quốc gia hoặc vùng lãnh thổ"
+                            : "Enter country or territory"
+                        }
+                        className="field mt-2"
+                        maxLength={80}
+                      />
+                    )}
                   </label>
                 </>
               )}

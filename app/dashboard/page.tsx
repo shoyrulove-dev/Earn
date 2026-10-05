@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { signOut } from "next-auth/react";
 import Image from "next/image";
+import { countryOptions, normalizeCountry } from "@/lib/countries";
 import {
   ArrowDownToLine,
   ArrowUpRight,
@@ -51,6 +52,7 @@ type User = {
   email?: string;
   image?: string;
   country?: string;
+  countryName?: string;
   locale?: Locale;
   phtBalance?: number;
   pendingPht?: number;
@@ -1841,13 +1843,14 @@ function ProfileView({
   nav: (s: Screen) => void;
 }) {
   const [country, setCountry] = useState(user?.country || "OTHER"),
+    [countryName, setCountryName] = useState(user?.countryName || ""),
     [locale, setLocale] = useState<Locale>(user?.locale || "en"),
     [msg, setMsg] = useState("");
   async function save() {
     const r = await fetch("/api/me", {
       method: "PATCH",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ country, locale }),
+      body: JSON.stringify({ country, countryName, locale }),
     });
     setMsg(r.ok ? t.saved : t.failed);
     if (r.ok) setTimeout(() => location.reload(), 400);
@@ -1903,12 +1906,26 @@ function ProfileView({
               value={country}
               onChange={(e) => setCountry(e.target.value)}
             >
-              <option value="VN">🇻🇳 Vietnam</option>
-              <option value="US">🇺🇸 United States</option>
-              <option value="CN">🇨🇳 China</option>
-              <option value="ES">🇪🇸 Spain</option>
+              {countryOptions(locale).map((item) => (
+                <option key={item.code} value={item.code}>
+                  {item.name}
+                </option>
+              ))}
               <option value="OTHER">🌍 Other</option>
             </select>
+            {normalizeCountry(country) === "OTHER" && (
+              <input
+                value={countryName}
+                onChange={(e) => setCountryName(e.target.value)}
+                placeholder={
+                  locale === "vi"
+                    ? "Nhập quốc gia/vùng lãnh thổ"
+                    : "Enter country/territory"
+                }
+                className="field mt-2"
+                maxLength={80}
+              />
+            )}
           </label>
           <label>
             <select
