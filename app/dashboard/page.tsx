@@ -22,7 +22,6 @@ import {
   Languages,
   LayoutGrid,
   LogOut,
-  MapPin,
   Menu,
   RefreshCw,
   Save,
@@ -612,7 +611,20 @@ const extraCopy = {
   },
 };
 type Words = typeof copy.en & typeof extraCopy.en;
-const pht = (n = 0) => `${Math.floor(n).toLocaleString()} PHT`;
+const PhtCoin = ({ size = 18 }: { size?: number }) => (
+  <Image
+    src="/pht-logo.png"
+    alt="PHT"
+    width={size}
+    height={size}
+    className="inline-block shrink-0 rounded-full object-cover align-[-0.18em] shadow-[0_0_10px_rgba(168,85,247,.4)]"
+  />
+);
+const pht = (n = 0) => (
+  <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+    {Math.floor(n).toLocaleString()} PHT <PhtCoin />
+  </span>
+);
 function currentDevice() {
   if (typeof window === "undefined") return "";
   let id = localStorage.getItem("pureearn_device_id");
@@ -624,12 +636,12 @@ function currentDevice() {
 }
 const tier = (n = 0) =>
   n >= 200000
-    ? { name: "Diamond", fee: "0%", bonus: "+10%" }
+    ? { name: "💎", fee: "0%", bonus: "+10%" }
     : n >= 50000
-      ? { name: "Gold", fee: "1%", bonus: "+5%" }
+      ? { name: "🥇", fee: "1%", bonus: "+5%" }
       : n >= 5000
-        ? { name: "Silver", fee: "3%", bonus: "+2%" }
-        : { name: "Bronze", fee: "5%", bonus: "0%" };
+        ? { name: "🥈", fee: "3%", bonus: "+2%" }
+        : { name: "🥉", fee: "5%", bonus: "0%" };
 const tierLabel = (_locale: Locale = "en", n = 0) => {
   const level =
     n >= 200000
@@ -639,7 +651,18 @@ const tierLabel = (_locale: Locale = "en", n = 0) => {
         : n >= 5000
           ? "silver"
           : "bronze";
-  return { bronze: "🥉", silver: "🥈", gold: "🥇", diamond: "💎" }[level];
+  if (level === "diamond") {
+    return (
+      <Image
+        src="/pht-diamond-badge.png"
+        alt="Diamond"
+        width={24}
+        height={24}
+        className="inline-block rounded-full"
+      />
+    );
+  }
+  return { bronze: "🥉", silver: "🥈", gold: "🥇" }[level];
 };
 const vipAvatar = (n = 0) =>
   n >= 200000
@@ -845,14 +868,24 @@ export default function DashboardPage() {
           <button onClick={() => setMenu(!menu)} className="round">
             <Menu size={19} />
           </button>
-          <div className="min-w-0 flex-1">
-            <small className="font-bold tracking-widest text-violet-300">
-              PURE EARN
-            </small>
-            <h1 className="truncate font-bold">
-              {t.hello},{" "}
-              {user?.name?.split(" ")[0] || user?.username || "member"}
-            </h1>
+          <div className="flex min-w-0 flex-1 items-center gap-2.5">
+            <Image
+              src="/pht-logo.png"
+              alt="Pure Earn"
+              width={36}
+              height={36}
+              className="rounded-xl shadow-[0_0_18px_rgba(168,85,247,.35)]"
+              priority
+            />
+            <div className="min-w-0">
+              <small className="font-bold tracking-widest text-violet-300">
+                PURE EARN
+              </small>
+              <h1 className="truncate font-bold">
+                {t.hello},{" "}
+                {user?.name?.split(" ")[0] || user?.username || "member"}
+              </h1>
+            </div>
           </div>
           <button className="round">
             <Bell size={18} />
@@ -1979,7 +2012,7 @@ function Title({
     </div>
   );
 }
-function Stat({ n, l }: { n: string; l: string }) {
+function Stat({ n, l }: { n: React.ReactNode; l: string }) {
   return (
     <div className="rounded-xl bg-white/5 p-2">
       <b className="block truncate text-sm">{n}</b>

@@ -11,5 +11,12 @@
   "theme_color": "#a970ff",
   "lang": "en",
   "categories": ["finance", "productivity", "utilities"],
-  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+  "icons": [
+    {
+      "src": "/pht-logo.png",
+      "sizes": "1250x1250",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
 }
