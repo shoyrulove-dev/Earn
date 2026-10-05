@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import SiteFooter from "@/components/site-footer";
 
 const siteUrl = process.env.NEXT_PUBLIC_APP_URL || "https://earn.blissbiovn.com";
 
@@ -29,5 +30,5 @@ export const metadata: Metadata = {
 export const viewport = { themeColor: "#211936", colorScheme: "dark" };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="en" className="dark"><body>{children}</body></html>;
+  return <html lang="en" className="dark"><body>{children}<SiteFooter/></body></html>;
 }
