@@ -630,7 +630,7 @@ const tier = (n = 0) =>
       : n >= 5000
         ? { name: "Silver", fee: "3%", bonus: "+2%" }
         : { name: "Bronze", fee: "5%", bonus: "0%" };
-const tierLabel = (locale: Locale = "en", n = 0) => {
+const tierLabel = (_locale: Locale = "en", n = 0) => {
   const level =
     n >= 200000
       ? "diamond"
@@ -639,19 +639,16 @@ const tierLabel = (locale: Locale = "en", n = 0) => {
         : n >= 5000
           ? "silver"
           : "bronze";
-  return {
-    en: {
-      bronze: "Bronze",
-      silver: "Silver",
-      gold: "Gold",
-      diamond: "Diamond",
-    },
-    vi: { bronze: "Đồng", silver: "Bạc", gold: "Vàng", diamond: "Kim Cương" },
-    zh: { bronze: "青铜", silver: "白银", gold: "黄金", diamond: "钻石" },
-    es: { bronze: "Bronce", silver: "Plata", gold: "Oro", diamond: "Diamante" },
-  }[locale][level];
+  return { bronze: "🥉", silver: "🥈", gold: "🥇", diamond: "💎" }[level];
 };
-const vipAvatar=(n=0)=>n>=200000?"from-cyan-300 to-blue-600 ring-cyan-300":n>=50000?"from-amber-300 to-yellow-600 ring-amber-300":n>=5000?"from-slate-200 to-slate-500 ring-slate-200":"from-orange-300 to-amber-700 ring-orange-300";
+const vipAvatar = (n = 0) =>
+  n >= 200000
+    ? "from-cyan-300 to-blue-600 ring-cyan-300"
+    : n >= 50000
+      ? "from-amber-300 to-yellow-600 ring-amber-300"
+      : n >= 5000
+        ? "from-slate-200 to-slate-500 ring-slate-200"
+        : "from-orange-300 to-amber-700 ring-orange-300";
 const productLabel = (locale: Locale = "en") =>
   ({
     en: "A PureHub Product",
@@ -1830,7 +1827,9 @@ function ProfileView({
       <Heading icon={UserRound} title={t.profile} />
       <section className="mt-4 overflow-hidden rounded-3xl border border-violet-300/15 bg-gradient-to-br from-[#493083] to-[#22183c] p-4">
         <div className="flex items-center gap-3">
-          <div className={`grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br text-2xl font-black shadow-lg ring-2 ring-offset-2 ring-offset-[#33225b] ${vipAvatar(user?.totalEarnedPht)}`}>
+          <div
+            className={`grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br text-2xl font-black shadow-lg ring-2 ring-offset-2 ring-offset-[#33225b] ${vipAvatar(user?.totalEarnedPht)}`}
+          >
             {user?.name?.[0] || "P"}
           </div>
           <div className="min-w-0 flex-1">
@@ -1850,7 +1849,9 @@ function ProfileView({
           </div>
           <div className="rounded-xl bg-black/15 p-2">
             <small className="text-violet-200">Total Earned</small>
-            <b className="block truncate text-xs">{pht(user?.totalEarnedPht)}</b>
+            <b className="block truncate text-xs">
+              {pht(user?.totalEarnedPht)}
+            </b>
           </div>
         </div>
       </section>
@@ -1862,14 +1863,10 @@ function ProfileView({
           <b>{t.region}</b>
         </div>
         <div className="mt-3 grid grid-cols-2 gap-2">
-          <label className="relative">
-            <MapPin
-              className="pointer-events-none absolute left-3 top-3 text-emerald-300"
-              size={16}
-            />
+          <label>
             <select
               aria-label="Country"
-              className="field pl-9"
+              className="field"
               value={country}
               onChange={(e) => setCountry(e.target.value)}
             >
@@ -1880,14 +1877,10 @@ function ProfileView({
               <option value="OTHER">🌍 Other</option>
             </select>
           </label>
-          <label className="relative">
-            <Languages
-              className="pointer-events-none absolute left-3 top-3 text-cyan-300"
-              size={16}
-            />
+          <label>
             <select
               aria-label="Language"
-              className="field pl-9"
+              className="field"
               value={locale}
               onChange={(e) => setLocale(e.target.value as Locale)}
             >
