@@ -47,3 +47,14 @@ export async function POST(request: Request) {
   return NextResponse.json({ ok: true, results });
 }
 
+export async function PUT() {
+  const session = await getAuthSession();
+  if (session?.user?.role !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token) return NextResponse.json({ error: "TELEGRAM_BOT_TOKEN is not configured" }, { status: 503 });
+  const me = await fetch(`https://api.telegram.org/bot${token}/getMe`, { cache:"no-store" }).then(r=>r.json());
+  if (!me.ok) return NextResponse.json({ error: me.description || "Telegram token rejected" }, { status: 502 });
+  const checks = await Promise.all(Object.entries(chats).map(async ([key,chat_id])=>{const data=await fetch(`https://api.telegram.org/bot${token}/getChatMember?chat_id=${chat_id}&user_id=${me.result.id}`,{cache:"no-store"}).then(r=>r.json());return {key,ok:Boolean(data.ok),status:data.result?.status||data.description};}));
+  return NextResponse.json({ ok:checks.every(x=>x.ok&&["administrator","creator"].includes(x.status)), bot:`@${me.result.username}`, checks });
+}
+
