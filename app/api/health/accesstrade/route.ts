@@ -11,7 +11,7 @@ export async function GET() {
       configured: true,
       approvedCampaigns: payload.data.length,
       totalCampaigns: payload.totalCampaigns,
-      approvals: payload.approvals,
+      approvals: { successful: payload.totalCampaigns },
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "AccessTrade unavailable";
