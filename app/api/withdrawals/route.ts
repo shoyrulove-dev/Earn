@@ -12,7 +12,8 @@ export async function POST(request: Request) {
   const body = await request.json(); const amount = Number(body.amount); const method = String(body.method || ""); const account = String(body.account || "").trim();
   if (!Number.isFinite(amount) || amount < 5) return NextResponse.json({ error: "Minimum withdrawal is $5" }, { status: 400 });
   await connectDB(); const current = await User.findById(session.user.id).select("country").lean() as { country?: string } | null;
-  const allowed = current?.country === "VN" ? vnMethods : ["USDT_BSC"];
+  const detected = request.headers.get("x-vercel-ip-country"); const isVietnam = current?.country === "VN" && (!detected || detected === "VN");
+  const allowed = isVietnam ? vnMethods : ["USDT_BSC"];
   if (!allowed.includes(method)) return NextResponse.json({ error: "This withdrawal method is not available in your country" }, { status: 400 });
   if (method === "USDT_BSC" && !/^0x[a-fA-F0-9]{40}$/.test(account)) return NextResponse.json({ error: "Enter a valid BSC address (0x + 40 hexadecimal characters)" }, { status: 400 });
   if (method === "MOMO" && !/^(0|\+84)\d{9,10}$/.test(account.replace(/\s/g, ""))) return NextResponse.json({ error: "Enter a valid MoMo phone number" }, { status: 400 });
