@@ -108,6 +108,9 @@ export default function LandingPage() {
   }
 
   useEffect(() => {
+    const referral = new URLSearchParams(location.search).get("ref");
+    if (referral)
+      document.cookie = `pureearn_ref=${encodeURIComponent(referral)}; Path=/; Max-Age=2592000; SameSite=Lax; Secure`;
     fetch("/api/locale")
       .then((r) => r.json())
       .then((x) => {

@@ -5,6 +5,7 @@ import OfferClick from "@/models/OfferClick";
 import Transaction from "@/models/Transaction";
 import User from "@/models/User";
 import { networkAmountToUsd, offerRewardPht, USER_SHARE } from "@/lib/pht";
+import { queueReferralReward } from "@/lib/referrals";
 
 const secretFor = (network: string) =>
   ({
@@ -60,7 +61,7 @@ export async function POST(
     Math.max(3, Number(process.env.PHT_PENDING_DAYS || 5)),
   );
   const availableAt = new Date(Date.now() + holdDays * 86400000);
-  await Transaction.create({
+  const earning = await Transaction.create({
     userId,
     type: "earning",
     currency: "PHT",
@@ -78,6 +79,7 @@ export async function POST(
     },
   });
   await User.findByIdAndUpdate(userId, { $inc: { pendingPht: rewardPht } });
+  await queueReferralReward(earning);
   await OfferClick.updateOne(
     { network, clickId },
     { $set: { status: "converted" } },

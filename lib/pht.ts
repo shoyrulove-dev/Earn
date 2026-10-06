@@ -1,6 +1,7 @@
 export const PHT_PER_USD = 1000;
 export const MIN_WITHDRAW_PHT = 5000;
-export const REFERRAL_RATE = 0.05;
+export const REFERRAL_WELCOME_PHT = 200;
+export const REFERRAL_ACTIVATION_PHT = 5000;
 export const USER_SHARE = Math.min(
   0.8,
   Math.max(0.1, Number(process.env.PHT_USER_SHARE || 0.5)),
@@ -57,3 +58,14 @@ export function offerRewardPht(grossUsd: number, totalEarnedPht = 0) {
 }
 export const vipLevelFor = (totalEarnedPht: number) =>
   tierFor(totalEarnedPht).name;
+
+export function referralTerms(totalEarnedPht: number) {
+  const level = vipLevelFor(totalEarnedPht);
+  return level === "diamond"
+    ? { level, rate: 0.12, activationBonus: 2000 }
+    : level === "gold"
+      ? { level, rate: 0.1, activationBonus: 1500 }
+      : level === "silver"
+        ? { level, rate: 0.07, activationBonus: 1000 }
+        : { level, rate: 0.05, activationBonus: 500 };
+}

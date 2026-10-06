@@ -3,7 +3,11 @@ import { getAuthSession } from "@/lib/auth";
 import { connectDB } from "@/lib/mongodb";
 import Transaction from "@/models/Transaction";
 import User from "@/models/User";
-import { REFERRAL_RATE, vipLevelFor } from "@/lib/pht";
+import { vipLevelFor } from "@/lib/pht";
+import {
+  approveReferralForEarning,
+  rejectReferralForEarning,
+} from "@/lib/referrals";
 
 export async function GET() {
   const session = await getAuthSession();
@@ -58,33 +62,8 @@ export async function PATCH(request: Request) {
       updated.vipInitialized = true;
       await updated.save();
     }
-    if (status === "approved") {
-      const earner = (await User.findById(tx.userId)
-        .select("referredBy")
-        .lean()) as { referredBy?: unknown } | null;
-      if (earner?.referredBy) {
-        const bonus = Math.floor(amount * REFERRAL_RATE);
-        if (bonus > 0) {
-          await User.findByIdAndUpdate(earner.referredBy, {
-            $inc: { phtBalance: bonus, referralEarnings: bonus },
-          });
-          await Transaction.create({
-            userId: earner.referredBy,
-            type: "referral",
-            currency: "PHT",
-            amount: bonus,
-            status: "approved",
-            source: "level-1-referral",
-            reference: `referral:${tx._id}`,
-            metadata: {
-              fromUserId: tx.userId,
-              earningId: tx._id,
-              rate: REFERRAL_RATE,
-            },
-          });
-        }
-      }
-    }
+    if (status === "approved") await approveReferralForEarning(tx);
+    else await rejectReferralForEarning(tx._id);
   }
   return NextResponse.json({ ok: true });
 }

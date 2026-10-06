@@ -4,6 +4,7 @@ import { networkAmountToUsd, offerRewardPht, USER_SHARE } from "@/lib/pht";
 import OfferClick from "@/models/OfferClick";
 import Transaction from "@/models/Transaction";
 import User from "@/models/User";
+import { queueReferralReward, rejectReferralForEarning } from "@/lib/referrals";
 
 function clickIdOf(row: Record<string, unknown>) {
   const direct = String(row.utm_content || row.sub1 || row.sub_1 || "");
@@ -77,6 +78,7 @@ export async function syncAccessTradeTransactions() {
         await User.findByIdAndUpdate(click.userId, {
           $inc: { pendingPht: rewardPht },
         });
+      if (status !== 2) await queueReferralReward(tx);
       created++;
     } else if (Number(tx.metadata?.networkStatus) !== status) {
       if (status === 2 && tx.status === "pending") {
@@ -84,6 +86,7 @@ export async function syncAccessTradeTransactions() {
         await User.findByIdAndUpdate(tx.userId, {
           $inc: { pendingPht: -Math.abs(tx.amount) },
         });
+        await rejectReferralForEarning(tx._id);
       } else if (status === 1 && tx.status === "pending")
         tx.availableAt = new Date(Date.now() + holdDays * 86400000);
       tx.metadata = {

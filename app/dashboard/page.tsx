@@ -489,7 +489,10 @@ const extraCopy = {
     bankName: "Bank name",
     accountHolder: "Account holder",
     accountAddress: "Account / LTC address",
-    referralRule: "5% of approved offer earnings · one level",
+    referralRule:
+      "VIP revenue share 5–12% · 200 PHT unlocks after the first approved task",
+    revenueShare: "Revenue share",
+    activationReward: "F1 reaches Silver",
     weekly: "Approved offer earnings in the last 7 days.",
     raceEmpty: "The weekly race has not started yet.",
     saved: "Preferences saved",
@@ -525,7 +528,10 @@ const extraCopy = {
     bankName: "Tên ngân hàng",
     accountHolder: "Tên chủ tài khoản",
     accountAddress: "Tài khoản / địa chỉ LTC",
-    referralRule: "Nhận 5% thưởng offer đã duyệt · một cấp",
+    referralRule:
+      "Chia sẻ 5–12% theo VIP · 200 PHT mở khóa sau nhiệm vụ đầu tiên được duyệt",
+    revenueShare: "Tỷ lệ chia sẻ",
+    activationReward: "F1 đạt hạng Bạc",
     weekly: "Thu nhập offer đã duyệt trong 7 ngày gần nhất.",
     raceEmpty: "Bảng đua tuần chưa có dữ liệu.",
     saved: "Đã lưu tùy chọn",
@@ -560,7 +566,9 @@ const extraCopy = {
     bankName: "银行名称",
     accountHolder: "账户持有人",
     accountAddress: "账户 / LTC 地址",
-    referralRule: "获得已批准任务奖励的 5% · 一级",
+    referralRule: "按 VIP 分享 5–12% · 首个任务批准后解锁 200 PHT",
+    revenueShare: "收益分成",
+    activationReward: "F1 达到白银",
     weekly: "最近 7 天已批准的任务收益。",
     raceEmpty: "本周排行榜暂无数据。",
     saved: "设置已保存",
@@ -596,7 +604,10 @@ const extraCopy = {
     bankName: "Nombre del banco",
     accountHolder: "Titular de la cuenta",
     accountAddress: "Cuenta / dirección LTC",
-    referralRule: "5% de las recompensas aprobadas · un nivel",
+    referralRule:
+      "5–12% según VIP · 200 PHT se liberan tras la primera tarea aprobada",
+    revenueShare: "Ingresos compartidos",
+    activationReward: "F1 alcanza Plata",
     weekly: "Ganancias aprobadas de los últimos 7 días.",
     raceEmpty: "La clasificación semanal aún no tiene datos.",
     saved: "Preferencias guardadas",
@@ -731,6 +742,9 @@ export default function DashboardPage() {
     [referrals, setReferrals] = useState<Referral[]>([]),
     [leaders, setLeaders] = useState<Leader[]>([]);
   const [members, setMembers] = useState(0),
+    [referralPending, setReferralPending] = useState(0),
+    [referralRate, setReferralRate] = useState(0.05),
+    [activationBonus, setActivationBonus] = useState(500),
     [screen, setScreen] = useState<Screen>("Home"),
     [loading, setLoading] = useState(true),
     [offerLoading, setOfferLoading] = useState(false),
@@ -769,6 +783,9 @@ export default function DashboardPage() {
           const x = await r[3].value.json();
           setMembers(x.members || 0);
           setReferrals(x.recent || []);
+          setReferralPending(x.pendingReferralPht || 0);
+          setReferralRate(x.terms?.rate || 0.05);
+          setActivationBonus(x.terms?.activationBonus || 500);
         }
         if (r[4].status === "fulfilled" && r[4].value.ok)
           setLeaders((await r[4].value.json()).leaders || []);
@@ -850,7 +867,15 @@ export default function DashboardPage() {
   ) : screen === "Wallet" ? (
     <WalletView user={user} txs={txs} t={t} nav={nav} />
   ) : screen === "Referrals" ? (
-    <ReferralView user={user} members={members} referrals={referrals} t={t} />
+    <ReferralView
+      user={user}
+      members={members}
+      referrals={referrals}
+      pending={referralPending}
+      rate={referralRate}
+      activationBonus={activationBonus}
+      t={t}
+    />
   ) : screen === "History" ? (
     <>
       <Heading icon={History} title={t.history} />
@@ -1710,15 +1735,21 @@ function ReferralView({
   user,
   members,
   referrals,
+  pending,
+  rate,
+  activationBonus,
   t,
 }: {
   user: User | null;
   members: number;
   referrals: Referral[];
+  pending: number;
+  rate: number;
+  activationBonus: number;
   t: Words;
 }) {
   const link = user?.referralCode
-    ? `https://earn.blissbiovn.com/?ref=${user.referralCode}`
+    ? `https://earn.blissbiovn.com/ref/${user.referralCode}`
     : "";
   return (
     <>
@@ -1728,6 +1759,11 @@ function ReferralView({
         <h2 className="text-3xl font-black">{pht(user?.referralEarnings)}</h2>
         <p className="mt-2 text-xs">{t.referralRule}</p>
       </section>
+      <div className="mt-3 grid grid-cols-3 gap-2">
+        <Stat n={`${Math.round(rate * 100)}%`} l={t.revenueShare} />
+        <Stat n={pht(pending)} l={t.pending} />
+        <Stat n={pht(activationBonus)} l={t.activationReward} />
+      </div>
       <div className="card mt-3">
         <b>{t.link}</b>
         <div className="mt-2 flex gap-2 rounded-xl bg-black/15 p-2">

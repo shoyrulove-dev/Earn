@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { connectDB } from "@/lib/mongodb";
-import { REFERRAL_RATE, vipLevelFor } from "@/lib/pht";
+import { vipLevelFor } from "@/lib/pht";
+import { approveReferralForEarning } from "@/lib/referrals";
 import Transaction from "@/models/Transaction";
 import User from "@/models/User";
 import { syncAccessTradeTransactions } from "@/lib/accesstrade-sync";
@@ -58,26 +59,7 @@ export async function GET(request: Request) {
           vipInitialized: true,
         },
       });
-    if (earner?.referredBy) {
-      const bonus = Math.floor(amount * REFERRAL_RATE);
-      if (
-        bonus > 0 &&
-        !(await Transaction.exists({ reference: `referral:${tx._id}` }))
-      ) {
-        await User.findByIdAndUpdate(earner.referredBy, {
-          $inc: { phtBalance: bonus, referralEarnings: bonus },
-        });
-        await Transaction.create({
-          userId: earner.referredBy,
-          type: "referral",
-          currency: "PHT",
-          amount: bonus,
-          status: "approved",
-          source: "level-1-referral",
-          reference: `referral:${tx._id}`,
-        });
-      }
-    }
+    await approveReferralForEarning(tx);
     settled++;
   }
   return NextResponse.json({ ok: true, accessTrade, settled });

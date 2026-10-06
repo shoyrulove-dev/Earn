@@ -6,6 +6,7 @@ import OfferProof from "@/models/OfferProof";
 import User from "@/models/User";
 import Transaction from "@/models/Transaction";
 import { tierFor, vipLevelFor } from "@/lib/pht";
+import { approveReferralForEarning } from "@/lib/referrals";
 export async function GET() {
   const s = await getAuthSession();
   if (s?.user?.role !== "admin")
@@ -101,7 +102,7 @@ export async function PATCH(request: Request) {
         updated.vipInitialized = true;
         await updated.save();
       }
-      await Transaction.create({
+      const earning = await Transaction.create({
         userId: submission.userId,
         type: "earning",
         currency: "PHT",
@@ -111,6 +112,7 @@ export async function PATCH(request: Request) {
         reference: `minijob:${submission._id}`,
         metadata: { submissionId: submission._id },
       });
+      await approveReferralForEarning(earning);
     }
   }
   return NextResponse.json({ submission });

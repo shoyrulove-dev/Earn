@@ -6,6 +6,7 @@ import BingXSubmission from "@/models/BingXSubmission";
 import Transaction from "@/models/Transaction";
 import User from "@/models/User";
 import { tierFor } from "@/lib/pht";
+import { queueReferralReward } from "@/lib/referrals";
 
 async function admin() {
   const session = await getAuthSession();
@@ -111,7 +112,9 @@ export async function PATCH(request: Request) {
   submission.reviewedBy = session.user.id as never;
   submission.reviewedAt = new Date();
   if (status === "approved") {
-    const user = await User.findById(submission.userId).select("totalEarnedPht");
+    const user = await User.findById(submission.userId).select(
+      "totalEarnedPht",
+    );
     const rewardPht = Math.floor(
       Number(submission.rewardPht) *
         (1 + tierFor(Number(user?.totalEarnedPht || 0)).bonusRate),
@@ -122,7 +125,7 @@ export async function PATCH(request: Request) {
     await User.findByIdAndUpdate(submission.userId, {
       $inc: { pendingPht: rewardPht },
     });
-    await Transaction.create({
+    const earning = await Transaction.create({
       userId: submission.userId,
       type: "earning",
       currency: "PHT",
@@ -138,6 +141,7 @@ export async function PATCH(request: Request) {
         baseRewardPht: submission.rewardPht,
       },
     });
+    await queueReferralReward(earning);
   }
   await submission.save();
   return NextResponse.json({ ok: true, submission });

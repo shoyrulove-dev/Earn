@@ -40,6 +40,9 @@ const UserSchema = new Schema(
     referralCode: { type: String, unique: true, sparse: true, index: true },
     referredBy: { type: Schema.Types.ObjectId, ref: "User" },
     referralEarnings: { type: Number, default: 0 },
+    activationBonusPaidAt: Date,
+    signupIpHash: { type: String, select: false },
+    referralRisk: { type: [String], default: [] },
   },
   { timestamps: true },
 );

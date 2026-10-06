@@ -4,6 +4,8 @@ import { connectDB } from "@/lib/mongodb";
 import { ensureUserIdentity } from "@/lib/user-identity";
 import User from "@/models/User";
 import { normalizeCountry } from "@/lib/countries";
+import crypto from "node:crypto";
+import { createWelcomeReward } from "@/lib/referrals";
 
 export async function POST(request: Request) {
   const {
@@ -56,10 +58,23 @@ export async function POST(request: Request) {
       { error: "Email or username is already in use" },
       { status: 409 },
     );
+  const ip = String(
+    request.headers.get("x-forwarded-for") ||
+      request.headers.get("x-real-ip") ||
+      "",
+  )
+    .split(",")[0]
+    .trim();
+  const signupIpHash = ip
+    ? crypto
+        .createHash("sha256")
+        .update(`${process.env.AUTH_SECRET || "pureearn"}:${ip}`)
+        .digest("hex")
+    : undefined;
   const referrer = referralCode
     ? await User.findOne({
         referralCode: String(referralCode).trim().toUpperCase(),
-      }).select("_id")
+      }).select("_id +signupIpHash")
     : null;
   const passwordHash = await bcrypt.hash(password, 12);
   const user = await User.create({
@@ -68,6 +83,11 @@ export async function POST(request: Request) {
     email: normalized,
     passwordHash,
     referredBy: referrer?._id,
+    signupIpHash,
+    referralRisk:
+      referrer?.signupIpHash && signupIpHash === referrer.signupIpHash
+        ? ["shared-signup-ip"]
+        : [],
     country: countryCode,
     countryName:
       countryCode === "OTHER"
@@ -80,6 +100,7 @@ export async function POST(request: Request) {
       process.env.ADMIN_EMAIL?.toLowerCase() === normalized ? "admin" : "user",
   });
   await ensureUserIdentity(user);
+  if (referrer?._id) await createWelcomeReward(user._id, referrer._id);
   const ready = await User.findById(user._id);
   return NextResponse.json(
     {
