@@ -7,6 +7,8 @@ import { connectDB } from "@/lib/mongodb";
 import { ensureUserIdentity } from "@/lib/user-identity";
 import { cookies } from "next/headers";
 import { createWelcomeReward } from "@/lib/referrals";
+import { headers } from "next/headers";
+import { rateLimit } from "@/lib/security";
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -15,8 +17,12 @@ export const authOptions: NextAuthOptions = {
       credentials: { email: {}, password: {} },
       async authorize(credentials) {
         if (!credentials?.email || !credentials.password) return null;
-        await connectDB();
+        const h = await headers();
+        const ip = String(h.get("x-forwarded-for") || h.get("x-real-ip") || "unknown").split(",")[0].trim();
         const login = String(credentials.email).toLowerCase().trim();
+        const limited = await rateLimit("login", `${ip}:${login}`, 10, 15 * 60 * 1000);
+        if (!limited.allowed) throw new Error("Too many login attempts");
+        await connectDB();
         const user = (await User.findOne({
           $or: [{ email: login }, { username: login }],
         }).lean()) as {
@@ -63,6 +69,7 @@ export const authOptions: NextAuthOptions = {
           $set: {
             name: user.name,
             image: user.image,
+            ...(account?.provider === "google" ? { emailVerifiedAt: new Date() } : {}),
             ...(admin ? { role: "admin" } : {}),
           },
           $setOnInsert: { email },

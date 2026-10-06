@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { signOut } from "next-auth/react";
 import Image from "next/image";
 import { countryOptions, normalizeCountry } from "@/lib/countries";
+import Turnstile from "@/components/Turnstile";
 import {
   ArrowDownToLine,
   ArrowUpRight,
@@ -1333,6 +1334,7 @@ function BingXTierOne({ locale }: { locale: Locale }) {
     [submission, setSubmission] = useState<{ status?: string } | null>(null),
     [uid, setUid] = useState(""),
     [proof, setProof] = useState(""),
+    [turnstileToken, setTurnstileToken] = useState(""),
     [msg, setMsg] = useState(""),
     c = bingxCopy[locale] || bingxCopy.en;
   useEffect(() => {
@@ -1348,7 +1350,7 @@ function BingXTierOne({ locale }: { locale: Locale }) {
     const r = await fetch("/api/bingx", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ bingxUid: uid, proofImageUrl: proof }),
+        body: JSON.stringify({ bingxUid: uid, proofImageUrl: proof, turnstileToken }),
       }),
       d = await r.json();
     setMsg(r.ok ? c.sent : d.error || "Error");
@@ -1395,6 +1397,7 @@ function BingXTierOne({ locale }: { locale: Locale }) {
             onChange={(e) => setProof(e.target.value)}
             placeholder={c.proof}
           />
+          <div className="mt-2"><Turnstile onToken={setTurnstileToken} /></div>
           <button
             onClick={submit}
             className="mt-2 w-full rounded-xl bg-violet-500 p-3 text-xs font-bold"
@@ -1410,6 +1413,7 @@ function BingXTierOne({ locale }: { locale: Locale }) {
 function OfferProofForm({ t }: { t: Words }) {
   const [proof, setProof] = useState(""),
     [contact, setContact] = useState(""),
+    [turnstileToken, setTurnstileToken] = useState(""),
     [msg, setMsg] = useState("");
   async function send() {
     const last = JSON.parse(
@@ -1423,6 +1427,7 @@ function OfferProofForm({ t }: { t: Words }) {
           ...last,
           proofUrl: proof,
           registeredContact: contact,
+          turnstileToken,
         }),
       }),
       d = await r.json();
@@ -1447,6 +1452,7 @@ function OfferProofForm({ t }: { t: Words }) {
         onChange={(e) => setProof(e.target.value)}
         placeholder={t.screenshot}
       />
+      <div className="mt-2"><Turnstile onToken={setTurnstileToken} /></div>
       <button
         onClick={send}
         className="mt-2 w-full rounded-xl bg-violet-500 p-3 text-xs font-bold"

@@ -3,6 +3,7 @@ import { getAuthSession } from "@/lib/auth";
 import { connectDB } from "@/lib/mongodb";
 import AppSetting from "@/models/AppSetting";
 import BingXSubmission from "@/models/BingXSubmission";
+import { rateLimit, requestIp, verifyTurnstile } from "@/lib/security";
 
 export async function GET() {
   const session=await getAuthSession();
@@ -17,7 +18,9 @@ export async function GET() {
 export async function POST(request:Request) {
   const session=await getAuthSession();
   if(!session?.user?.id)return NextResponse.json({error:"Unauthorized"},{status:401});
-  const {bingxUid,proofImageUrl}=await request.json();
+  const {bingxUid,proofImageUrl,turnstileToken}=await request.json();
+  const limited=await rateLimit("bingx-proof",session.user.id,5,3600000);if(!limited.allowed)return NextResponse.json({error:"Too many submissions"},{status:429});
+  if(!(await verifyTurnstile(turnstileToken,requestIp(request))))return NextResponse.json({error:"Security check failed"},{status:400});
   if(!/^\d{5,30}$/.test(String(bingxUid||"")))return NextResponse.json({error:"Enter a valid numeric BingX UID"},{status:400});
   try{new URL(String(proofImageUrl||""));}catch{return NextResponse.json({error:"Enter a valid KYC proof image URL"},{status:400});}
   await connectDB();

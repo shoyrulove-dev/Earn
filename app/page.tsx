@@ -5,6 +5,7 @@ import { signIn } from "next-auth/react";
 import { useEffect, useState } from "react";
 import { ArrowRight, CheckCircle2, LockKeyhole, Sparkles } from "lucide-react";
 import { countryOptions, normalizeCountry } from "@/lib/countries";
+import Turnstile from "@/components/Turnstile";
 
 const words = {
   en: {
@@ -98,6 +99,7 @@ export default function LandingPage() {
   const [locale, setLocale] = useState<Locale>("en");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState("");
   const t = words[locale];
 
   function changeLocale(next: Locale) {
@@ -140,6 +142,7 @@ export default function LandingPage() {
           countryName,
           locale,
           referralCode: new URLSearchParams(location.search).get("ref"),
+          turnstileToken,
         }),
       });
       if (!r.ok) {
@@ -287,6 +290,7 @@ export default function LandingPage() {
                 className="field"
               />
               {error && <p className="text-sm text-red-300">{error}</p>}
+              {mode === "register" && <Turnstile onToken={setTurnstileToken} />}
               <button
                 disabled={busy}
                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-violet-400 py-3 font-bold"

@@ -20,6 +20,7 @@ const UserSchema = new Schema(
     paymentAccounts: { type: Schema.Types.Mixed, default: {} },
     phtBalance: { type: Number, default: 0 },
     pendingPht: { type: Number, default: 0 },
+    phtDebt: { type: Number, default: 0, min: 0 },
     totalEarnedPht: { type: Number, default: 0, min: 0 },
     vipLevel: {
       type: String,
@@ -43,6 +44,11 @@ const UserSchema = new Schema(
     activationBonusPaidAt: Date,
     signupIpHash: { type: String, select: false },
     referralRisk: { type: [String], default: [] },
+    emailVerifiedAt: Date,
+    emailVerificationTokenHash: { type: String, select: false },
+    emailVerificationExpiresAt: { type: Date, select: false },
+    payoutDestinationHash: { type: String, select: false },
+    payoutDestinationChangedAt: Date,
   },
   { timestamps: true },
 );

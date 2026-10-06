@@ -6,6 +6,8 @@ import User from "@/models/User";
 import { normalizeCountry } from "@/lib/countries";
 import crypto from "node:crypto";
 import { createWelcomeReward } from "@/lib/referrals";
+import { rateLimit, requestIp, secureHash, verifyTurnstile } from "@/lib/security";
+import { sendVerificationEmail } from "@/lib/email";
 
 export async function POST(request: Request) {
   const {
@@ -17,7 +19,12 @@ export async function POST(request: Request) {
     country,
     countryName,
     locale,
+    turnstileToken,
   } = await request.json();
+  const ip = requestIp(request);
+  const limited = await rateLimit("register", ip, 5, 60 * 60 * 1000);
+  if (!limited.allowed) return NextResponse.json({ error: "Too many registrations. Please try again later." }, { status: 429, headers: { "Retry-After": String(limited.retryAfter) } });
+  if (!(await verifyTurnstile(turnstileToken, ip))) return NextResponse.json({ error: "Security check failed. Please try again." }, { status: 400 });
   if (!email || !password || password.length < 8)
     return NextResponse.json(
       { error: "Email and a password of at least 8 characters are required" },
@@ -58,13 +65,6 @@ export async function POST(request: Request) {
       { error: "Email or username is already in use" },
       { status: 409 },
     );
-  const ip = String(
-    request.headers.get("x-forwarded-for") ||
-      request.headers.get("x-real-ip") ||
-      "",
-  )
-    .split(",")[0]
-    .trim();
   const signupIpHash = ip
     ? crypto
         .createHash("sha256")
@@ -77,11 +77,14 @@ export async function POST(request: Request) {
       }).select("_id +signupIpHash")
     : null;
   const passwordHash = await bcrypt.hash(password, 12);
+  const verificationToken = crypto.randomBytes(32).toString("hex");
   const user = await User.create({
     name: name?.trim() || handle || normalized.split("@")[0],
     ...(handle ? { username: handle } : {}),
     email: normalized,
     passwordHash,
+    emailVerificationTokenHash: secureHash(verificationToken),
+    emailVerificationExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
     referredBy: referrer?._id,
     signupIpHash,
     referralRisk:
@@ -101,6 +104,7 @@ export async function POST(request: Request) {
   });
   await ensureUserIdentity(user);
   if (referrer?._id) await createWelcomeReward(user._id, referrer._id);
+  const verificationEmailSent = await sendVerificationEmail(normalized, verificationToken);
   const ready = await User.findById(user._id);
   return NextResponse.json(
     {
@@ -112,6 +116,7 @@ export async function POST(request: Request) {
         name: ready!.name,
         referralCode: ready!.referralCode,
       },
+      verificationEmailSent,
     },
     { status: 201 },
   );

@@ -1,3 +1,4 @@
 import mongoose, { Schema, models } from "mongoose";
-const AuditLogSchema = new Schema({ actorId: { type: Schema.Types.ObjectId, ref: "User" }, action: { type: String, required: true }, target: String, ip: String, userAgent: String, metadata: Schema.Types.Mixed }, { timestamps: true });
+const AuditLogSchema = new Schema({ actorId: { type: Schema.Types.ObjectId, ref: "User", immutable: true }, action: { type: String, required: true, immutable: true }, target: { type: String, immutable: true }, ip: { type: String, immutable: true }, userAgent: { type: String, immutable: true }, metadata: { type: Schema.Types.Mixed, immutable: true }, previousHash: { type: String, immutable: true }, hash: { type: String, immutable: true, unique: true, sparse: true } }, { timestamps: true });
+for (const hook of ["updateOne", "updateMany", "findOneAndUpdate", "deleteOne", "deleteMany", "findOneAndDelete"] as const) AuditLogSchema.pre(hook, function () { throw new Error("Audit logs are append-only"); });
 export default models.AuditLog || mongoose.model("AuditLog", AuditLogSchema);

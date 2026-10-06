@@ -7,6 +7,7 @@ type Submission = { _id: string; proofUrl: string; userId?: { email?: string; na
 type Stats = { users: number; minijobs: number; pending: number };
 type BingXSubmission = { _id:string; bingxUid:string; proofImageUrl:string; rewardPht:number; userId?:{email?:string;name?:string;userId?:string} };
 type BingXConfig = { affiliateId:string; affiliateUrl:string; active:boolean; autoAnnounce:boolean; rewardPht:number; holdDays:number; mysteryBox:string };
+type AdminTransaction = { _id:string; type:string; amount:number; source?:string; status:string; createdAt:string; userId?:{email?:string;name?:string;country?:string}; metadata?:{netPht?:number;netUsd?:number;account?:string;bankName?:string;accountName?:string} };
 
 export default function AdminPage() {
   const [items,setItems] = useState<Submission[]>([]);
@@ -18,19 +19,23 @@ export default function AdminPage() {
   const [sending,setSending] = useState(false);
   const [bingx,setBingx]=useState<BingXConfig>({affiliateId:"",affiliateUrl:"",active:false,autoAnnounce:true,rewardPht:100,holdDays:7,mysteryBox:"Mystery Box worth at least 5 USDT for eligible new users"});
   const [bingxItems,setBingxItems]=useState<BingXSubmission[]>([]);
+  const [transactions,setTransactions]=useState<AdminTransaction[]>([]);
+  const [totp,setTotp]=useState("");
 
   async function load() {
-    const [submissions, summary, telegram, bingxData] = await Promise.all([
+    const [submissions, summary, telegram, bingxData, transactionData] = await Promise.all([
       fetch("/api/admin/submissions"),
       fetch("/api/admin/stats"),
       fetch("/api/admin/telegram"),
       fetch("/api/admin/bingx"),
+      fetch("/api/admin/transactions"),
     ]);
     if (!submissions.ok) return setMessage("Admin access required");
     setItems((await submissions.json()).submissions || []);
     if (summary.ok) setStats(await summary.json());
     if (telegram.ok) setTelegramReady((await telegram.json()).configured);
     if (bingxData.ok){const d=await bingxData.json();setBingx(x=>({...x,...d.config}));setBingxItems(d.submissions||[])}
+    if (transactionData.ok) setTransactions((await transactionData.json()).transactions||[]);
   }
 
   async function review(id:string,status:"approved"|"rejected") {
@@ -50,6 +55,7 @@ export default function AdminPage() {
   async function testTelegram(){const r=await fetch("/api/admin/telegram",{method:"PUT"}),d=await r.json();setMessage(r.ok&&d.ok?`Telegram ready: ${d.bot}`:d.error||`Bot lacks admin rights: ${JSON.stringify(d.checks||[])}`)}
   async function saveBingX(){const r=await fetch("/api/admin/bingx",{method:"PUT",headers:{"content-type":"application/json"},body:JSON.stringify(bingx)}),d=await r.json();setMessage(r.ok?"BingX settings saved.":d.error||"Save failed");if(r.ok)load()}
   async function reviewBingX(id:string,status:"approved"|"rejected"){const r=await fetch("/api/admin/bingx",{method:"PATCH",headers:{"content-type":"application/json"},body:JSON.stringify({id,status})}),d=await r.json();setMessage(r.ok?`BingX KYC ${status}. Reward is ${status==="approved"?"pending for 7 days":"not issued"}.`:d.error||"Review failed");if(r.ok)load()}
+  async function reviewTransaction(id:string,status:"approved"|"rejected"){const r=await fetch("/api/admin/transactions",{method:"PATCH",headers:{"content-type":"application/json"},body:JSON.stringify({id,status,totp})}),d=await r.json();setMessage(r.ok?`Transaction ${status}.`:d.error||"Review failed");if(r.ok){setTotp("");load()}}
 
   useEffect(()=>{load()},[]);
 
