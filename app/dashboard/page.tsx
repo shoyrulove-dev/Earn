@@ -498,7 +498,7 @@ const extraCopy = {
     accountHolder: "Account holder",
     accountAddress: "Account / LTC address",
     referralRule:
-      "VIP revenue share 5–12% · 200 PHT unlocks after the first approved task",
+      "VIP revenue share 5–12% · 100 PHT unlocks after the first approved task",
     revenueShare: "Revenue share",
     activationReward: "F1 reaches Silver",
     weekly: "Approved offer earnings in the last 7 days.",
@@ -537,7 +537,7 @@ const extraCopy = {
     accountHolder: "Tên chủ tài khoản",
     accountAddress: "Tài khoản / địa chỉ LTC",
     referralRule:
-      "Chia sẻ 5–12% theo VIP · 200 PHT mở khóa sau nhiệm vụ đầu tiên được duyệt",
+      "Chia sẻ 5–12% theo VIP · 100 PHT mở khóa sau nhiệm vụ đầu tiên được duyệt",
     revenueShare: "Tỷ lệ chia sẻ",
     activationReward: "F1 đạt hạng Bạc",
     weekly: "Thu nhập offer đã duyệt trong 7 ngày gần nhất.",
@@ -574,7 +574,7 @@ const extraCopy = {
     bankName: "银行名称",
     accountHolder: "账户持有人",
     accountAddress: "账户 / LTC 地址",
-    referralRule: "按 VIP 分享 5–12% · 首个任务批准后解锁 200 PHT",
+    referralRule: "按 VIP 分享 5–12% · 首个任务批准后解锁 100 PHT",
     revenueShare: "收益分成",
     activationReward: "F1 达到白银",
     weekly: "最近 7 天已批准的任务收益。",
@@ -613,7 +613,7 @@ const extraCopy = {
     accountHolder: "Titular de la cuenta",
     accountAddress: "Cuenta / dirección LTC",
     referralRule:
-      "5–12% según VIP · 200 PHT se liberan tras la primera tarea aprobada",
+      "5–12% según VIP · 100 PHT se liberan tras la primera tarea aprobada",
     revenueShare: "Ingresos compartidos",
     activationReward: "F1 alcanza Plata",
     weekly: "Ganancias aprobadas de los últimos 7 días.",
@@ -1224,10 +1224,10 @@ function Balance({
 }
 function Checkin({ user, t }: { user: User | null; t: Words }) {
   const [msg, setMsg] = useState("");
-  const today = new Date().toDateString(),
+  const today = new Date().toISOString().slice(0, 10),
     done =
       user?.lastCheckinAt &&
-      new Date(user.lastCheckinAt).toDateString() === today;
+      new Date(user.lastCheckinAt).toISOString().slice(0, 10) === today;
   async function claim() {
     const r = await fetch("/api/pht/checkin", { method: "POST" }),
       d = await r.json();
@@ -1256,9 +1256,9 @@ function Checkin({ user, t }: { user: User | null; t: Words }) {
       </div>
       {msg && <p className="mt-2 text-xs text-emerald-300">{msg}</p>}
       <div className="mt-3 grid grid-cols-7 gap-1">
-        {[10, 15, 20, 25, 35, 50, 100].map((x, i) => (
+        {Array.from({ length: 7 }, () => 5).map((x, i) => (
           <div
-            key={x}
+            key={i}
             className={`rounded-lg p-1 text-center text-[9px] ${(user?.checkinStreak || 0) > i ? "bg-violet-500" : "bg-white/5"}`}
           >
             D{i + 1}

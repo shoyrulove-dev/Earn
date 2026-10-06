@@ -190,10 +190,13 @@ async function releaseReferralMilestones(userId: unknown, referrerId: unknown) {
     { new: true },
   );
   if (welcome) {
+    // Reconcile against the immutable ledger amount. This also preserves
+    // already-promised legacy bonuses after the configured amount changes.
+    const welcomeAmount = Math.max(0, Number(welcome.amount || 0));
     await User.findByIdAndUpdate(userId, {
       $inc: {
-        pendingPht: -REFERRAL_WELCOME_PHT,
-        phtBalance: REFERRAL_WELCOME_PHT,
+        pendingPht: -welcomeAmount,
+        phtBalance: welcomeAmount,
       },
     });
     await ReferralReward.updateOne(

@@ -1,6 +1,6 @@
 export const PHT_PER_USD = 1000;
 export const MIN_WITHDRAW_PHT = 5000;
-export const REFERRAL_WELCOME_PHT = 200;
+export const REFERRAL_WELCOME_PHT = 100;
 export const REFERRAL_ACTIVATION_PHT = 5000;
 export const USER_SHARE = Math.min(
   0.8,

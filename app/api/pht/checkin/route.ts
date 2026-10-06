@@ -5,7 +5,7 @@ import User from "@/models/User";
 import Transaction from "@/models/Transaction";
 import { vipLevelFor } from "@/lib/pht";
 
-const rewards = [10, 15, 20, 25, 35, 50, 100];
+const DAILY_CHECKIN_PHT = 5;
 export async function POST() {
   const session = await getAuthSession();
   if (!session?.user?.id)
@@ -35,7 +35,7 @@ export async function POST() {
   const yesterday = today - 86400000;
   const streak =
     last === yesterday ? Math.min(7, Number(user.checkinStreak || 0) + 1) : 1;
-  const reward = rewards[streak - 1];
+  const reward = DAILY_CHECKIN_PHT;
   try {
     await Transaction.create({
       userId: user._id,
