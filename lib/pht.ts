@@ -62,10 +62,10 @@ export const vipLevelFor = (totalEarnedPht: number) =>
 export function referralTerms(totalEarnedPht: number) {
   const level = vipLevelFor(totalEarnedPht);
   return level === "diamond"
-    ? { level, rate: 0.12, activationBonus: 2000 }
+    ? { level, rate: 0.1, activationBonus: 1000 }
     : level === "gold"
-      ? { level, rate: 0.1, activationBonus: 1500 }
+      ? { level, rate: 0.08, activationBonus: 750 }
       : level === "silver"
-        ? { level, rate: 0.07, activationBonus: 1000 }
-        : { level, rate: 0.05, activationBonus: 500 };
+        ? { level, rate: 0.06, activationBonus: 500 }
+        : { level, rate: 0.05, activationBonus: 300 };
 }
