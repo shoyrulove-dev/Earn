@@ -192,6 +192,13 @@ const offerDetailCopy = {
   },
 };
 
+const accessTradeRegionCopy: Record<Locale, string> = {
+  en: "AccessTrade CPA offers are available only to users in Vietnam.",
+  vi: "Các ưu đãi CPA từ AccessTrade chỉ dành cho người dùng tại Việt Nam.",
+  zh: "AccessTrade CPA 任务仅面向越南用户开放。",
+  es: "Las ofertas CPA de AccessTrade solo están disponibles para usuarios de Vietnam.",
+};
+
 const payoutCopy = {
   en: {
     method: "Payment method",
@@ -830,6 +837,7 @@ export default function DashboardPage() {
     [screen, setScreen] = useState<Screen>("Home"),
     [loading, setLoading] = useState(true),
     [offerLoading, setOfferLoading] = useState(false),
+    [accessTradeRestricted, setAccessTradeRestricted] = useState(false),
     [menu, setMenu] = useState(false),
     [notice, setNotice] = useState("");
   const locale = user?.locale || "en",
@@ -881,6 +889,7 @@ export default function DashboardPage() {
       const r = await fetch("/api/offers/accesstrade", { cache: "no-store" }),
         d = await r.json();
       if (!r.ok) throw new Error(d.error);
+      setAccessTradeRestricted(Boolean(d.restricted));
       setCampaigns(
         (Array.isArray(d.data) ? d.data : [])
           .map((x: Record<string, unknown>) => ({
@@ -943,6 +952,7 @@ export default function DashboardPage() {
       loading={offerLoading}
       t={t}
       locale={locale}
+      accessTradeRestricted={accessTradeRestricted}
       refresh={loadOffers}
       open={openOffer}
     />
@@ -1350,6 +1360,7 @@ function OffersView({
   loading,
   t,
   locale,
+  accessTradeRestricted,
   refresh,
   open,
 }: {
@@ -1358,6 +1369,7 @@ function OffersView({
   loading: boolean;
   t: Words;
   locale: Locale;
+  accessTradeRestricted: boolean;
   refresh: () => void;
   open: (c: Campaign) => void;
 }) {
@@ -1395,19 +1407,27 @@ function OffersView({
           </div>
         </>
       )}
-      <Title e={t.verifiedGroup} n={`${t.partner} (${list.length})`} />
-      <div className="space-y-2">
-        {list.map((x) => (
-          <OfferCard
-            key={x.campaign_id}
-            x={x}
-            t={t}
-            click={() => setSelected(x)}
-          />
-        ))}
-        {!list.length && <Empty text={t.noOffers} />}
-      </div>
-      <OfferProofForm t={t} />
+      {accessTradeRestricted ? (
+        <div className="mt-5 rounded-2xl border border-cyan-300/15 bg-cyan-300/5 p-4 text-sm leading-6 text-cyan-100">
+          {accessTradeRegionCopy[locale]}
+        </div>
+      ) : (
+        <>
+          <Title e={t.verifiedGroup} n={`${t.partner} (${list.length})`} />
+          <div className="space-y-2">
+            {list.map((x) => (
+              <OfferCard
+                key={x.campaign_id}
+                x={x}
+                t={t}
+                click={() => setSelected(x)}
+              />
+            ))}
+            {!list.length && <Empty text={t.noOffers} />}
+          </div>
+          <OfferProofForm t={t} />
+        </>
+      )}
       {selected && (
         <div
           className="fixed inset-0 z-[70] flex items-end justify-center bg-black/70 p-0 backdrop-blur-sm md:items-center md:p-5"
@@ -1437,9 +1457,7 @@ function OffersView({
             </div>
             <div className="mt-4 grid grid-cols-2 gap-2">
               <div className="rounded-2xl bg-emerald-400/10 p-3">
-                <small className="text-emerald-200">
-                  {detail.estimated}
-                </small>
+                <small className="text-emerald-200">{detail.estimated}</small>
                 <b className="mt-1 block text-lg text-emerald-300">
                   {selected.estimated_reward_pht
                     ? `${selected.estimated_reward_pht.toLocaleString()} PHT`
@@ -1447,9 +1465,7 @@ function OffersView({
                 </b>
               </div>
               <div className="rounded-2xl bg-amber-300/10 p-3">
-                <small className="text-amber-100">
-                  {detail.pending}
-                </small>
+                <small className="text-amber-100">{detail.pending}</small>
                 <b className="mt-1 block text-lg text-amber-200">
                   {selected.hold_days || 5} {detail.days}
                 </b>
@@ -1463,15 +1479,15 @@ function OffersView({
               {detail
                 .steps(selected.name, selected.hold_days || 5)
                 .map((step, i) => (
-                <li
-                  key={i}
-                  className="flex gap-3 rounded-xl bg-white/5 p-3 text-sm leading-5"
-                >
-                  <b className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-violet-500 text-xs">
-                    {i + 1}
-                  </b>
-                  <span>{step}</span>
-                </li>
+                  <li
+                    key={i}
+                    className="flex gap-3 rounded-xl bg-white/5 p-3 text-sm leading-5"
+                  >
+                    <b className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-violet-500 text-xs">
+                      {i + 1}
+                    </b>
+                    <span>{step}</span>
+                  </li>
                 ))}
             </ol>
             <div className="mt-4 rounded-xl border border-red-300/15 bg-red-300/5 p-3 text-xs leading-5 text-red-100">
