@@ -19,6 +19,7 @@ const UserSchema = new Schema(
     locale: { type: String, enum: ["en", "vi", "zh", "es"], default: "en" },
     paymentAccounts: { type: Schema.Types.Mixed, default: {} },
     phtBalance: { type: Number, default: 0 },
+    usdBalance: { type: Number, default: 0, min: 0 },
     pendingPht: { type: Number, default: 0 },
     phtDebt: { type: Number, default: 0, min: 0 },
     totalEarnedPht: { type: Number, default: 0, min: 0 },

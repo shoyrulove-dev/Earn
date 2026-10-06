@@ -43,13 +43,14 @@ export async function PATCH(request: Request) {
   const amount = Math.abs(Number(tx.amount));
   if (tx.type === "withdrawal") {
     const threshold = Number(process.env.ADMIN_LARGE_WITHDRAWAL_PHT || 50000);
-    if (status === "approved" && amount >= threshold && !verifyTotp(totp)) {
+    const comparablePht = tx.currency === "USD" ? amount * 1000 : amount;
+    if (status === "approved" && comparablePht >= threshold && !verifyTotp(totp)) {
       tx.status = "pending";
       await tx.save();
       return NextResponse.json({ error: "A valid administrator TOTP code is required for this withdrawal." }, { status: 401 });
     }
     if (status === "rejected")
-      await User.findByIdAndUpdate(tx.userId, { $inc: { phtBalance: amount } });
+      await User.findByIdAndUpdate(tx.userId, { $inc: tx.currency === "USD" ? { usdBalance: amount } : { phtBalance: amount } });
     await writeAudit({ actorId: session.user.id, action: `admin.withdrawal.${status}`, target: String(tx._id), ip: requestIp(request), userAgent: request.headers.get("user-agent") || undefined, metadata: { amount, userId: String(tx.userId), source: tx.source } });
     return NextResponse.json({ ok: true });
   }

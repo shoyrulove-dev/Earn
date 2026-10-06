@@ -56,6 +56,7 @@ type User = {
   countryName?: string;
   locale?: Locale;
   phtBalance?: number;
+  usdBalance?: number;
   pendingPht?: number;
   totalEarnedPht?: number;
   vipLevel?: "bronze" | "silver" | "gold" | "diamond";
@@ -86,6 +87,12 @@ type Campaign = {
   commission_type?: string;
   merchant?: string;
   url?: string;
+  description?: string;
+  campaign_type?: string;
+  estimated_reward_pht?: number;
+  hold_days?: number;
+  reward_note?: string;
+  instructions?: string[];
 };
 type Tx = {
   _id: string;
@@ -335,7 +342,7 @@ const copy = {
     cashout: "Cash out",
     amount: "Amount (PHT)",
     request: "Request withdrawal",
-    min: "Minimum 5,000 PHT. Fees depend on your loyalty tier.",
+    min: "Minimum $5 USD. Swap PHT to USD before withdrawal. Fees depend on your tier.",
     recent: "Recent transactions",
     memberId: "Member ID",
     region: "Region & language",
@@ -375,7 +382,7 @@ const copy = {
     cashout: "Rút thưởng",
     amount: "Số PHT",
     request: "Gửi yêu cầu rút",
-    min: "Tối thiểu 5.000 PHT. Phí tùy theo cấp thành viên.",
+    min: "Tối thiểu 5 USD. Hãy đổi PHT sang USD trước khi rút. Phí tùy cấp thành viên.",
     recent: "Giao dịch gần đây",
     memberId: "Mã thành viên",
     region: "Quốc gia & ngôn ngữ",
@@ -415,7 +422,7 @@ const copy = {
     cashout: "兑换奖励",
     amount: "PHT 数量",
     request: "提交提现",
-    min: "最低 5,000 PHT，费用取决于会员等级。",
+    min: "最低提现 5 USD。请先将 PHT 兑换为 USD。",
     recent: "最近交易",
     memberId: "会员编号",
     region: "国家和语言",
@@ -455,7 +462,7 @@ const copy = {
     cashout: "Retirar",
     amount: "Cantidad (PHT)",
     request: "Solicitar retiro",
-    min: "Mínimo 5.000 PHT. La comisión depende del nivel.",
+    min: "Mínimo 5 USD. Convierte PHT a USD antes de retirar.",
     recent: "Transacciones recientes",
     memberId: "ID de miembro",
     region: "País e idioma",
@@ -501,7 +508,7 @@ const extraCopy = {
     admin: "Admin dashboard",
     guideItems: [
       "1,000 PHT = 1 USD.",
-      "Minimum withdrawal: 5,000 PHT.",
+      "Minimum withdrawal: $5 USD after swapping PHT to USD.",
       "VIP uses lifetime earned PHT: Bronze 5%, Silver 3%, Gold 1%, Diamond 0% withdrawal fee.",
       "Vietnam: bank, MoMo or USDT BSC. Other countries: USDT BSC or LTC.",
       "Partner rewards stay pending for 3–7 days while conversions are validated.",
@@ -540,7 +547,7 @@ const extraCopy = {
     admin: "Trang quản trị",
     guideItems: [
       "1.000 PHT = 1 USD.",
-      "Mức rút tối thiểu: 5.000 PHT.",
+      "Mức rút tối thiểu: 5 USD sau khi đổi PHT sang USD.",
       "VIP tính theo tổng PHT kiếm được: Đồng 5%, Bạc 3%, Vàng 1%, Kim Cương 0% phí rút.",
       "Việt Nam: ngân hàng, MoMo hoặc USDT BSC. Quốc gia khác: USDT BSC hoặc LTC.",
       "Thưởng đối tác được giữ chờ 3–7 ngày để xác minh chuyển đổi.",
@@ -577,7 +584,7 @@ const extraCopy = {
     admin: "管理后台",
     guideItems: [
       "1,000 PHT = 1 USD。",
-      "最低提现：5,000 PHT。",
+      "最低提现：兑换后余额 5 USD。",
       "VIP 按累计赚取 PHT 计算：青铜 5%、白银 3%、黄金 1%、钻石 0% 提现费。",
       "越南：银行、MoMo 或 USDT BSC；其他国家：USDT BSC 或 LTC。",
       "合作伙伴奖励将待处理 3–7 天以验证转化。",
@@ -616,7 +623,7 @@ const extraCopy = {
     admin: "Panel de administración",
     guideItems: [
       "1.000 PHT = 1 USD.",
-      "Retiro mínimo: 5.000 PHT.",
+      "Retiro mínimo: 5 USD después de convertir PHT.",
       "El VIP usa PHT ganado de por vida: Bronce 5%, Plata 3%, Oro 1% y Diamante 0% de comisión.",
       "Vietnam: banco, MoMo o USDT BSC. Otros países: USDT BSC o LTC.",
       "Las recompensas quedan pendientes entre 3 y 7 días durante la validación.",
@@ -866,7 +873,7 @@ export default function DashboardPage() {
       open={openOffer}
     />
   ) : screen === "Wallet" ? (
-    <WalletView user={user} txs={txs} t={t} nav={nav} />
+    <WalletView user={user} txs={txs} t={t} nav={nav} onUser={setUser} />
   ) : screen === "Referrals" ? (
     <ReferralView
       user={user}
@@ -1281,6 +1288,7 @@ function OffersView({
   open: (c: Campaign) => void;
 }) {
   const [q, setQ] = useState("");
+  const [selected, setSelected] = useState<Campaign | null>(null);
   const list = useMemo(
     () =>
       campaigns.filter((x) => x.name.toLowerCase().includes(q.toLowerCase())),
@@ -1315,11 +1323,12 @@ function OffersView({
       <Title e={t.verifiedGroup} n={`${t.partner} (${list.length})`} />
       <div className="space-y-2">
         {list.map((x) => (
-          <OfferCard key={x.campaign_id} x={x} t={t} click={() => open(x)} />
+          <OfferCard key={x.campaign_id} x={x} t={t} click={() => setSelected(x)} />
         ))}
         {!list.length && <Empty text={t.noOffers} />}
       </div>
       <OfferProofForm t={t} />
+      {selected && <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/70 p-0 backdrop-blur-sm md:items-center md:p-5" onClick={()=>setSelected(null)}><section className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-t-3xl border border-white/10 bg-[#211737] p-5 md:rounded-3xl" onClick={e=>e.stopPropagation()}><div className="flex items-start gap-3">{selected.logo&&<img src={selected.logo} alt="" className="h-14 w-14 rounded-2xl object-cover"/>}<div className="min-w-0 flex-1"><span className="text-[10px] font-bold uppercase tracking-widest text-cyan-300">{selected.campaign_type||"Offer"} · AccessTrade</span><h2 className="mt-1 text-xl font-black">{selected.name}</h2></div><button onClick={()=>setSelected(null)} className="round"><X size={18}/></button></div><div className="mt-4 grid grid-cols-2 gap-2"><div className="rounded-2xl bg-emerald-400/10 p-3"><small className="text-emerald-200">{locale==="vi"?"Thưởng dự kiến":"Estimated reward"}</small><b className="mt-1 block text-lg text-emerald-300">{selected.estimated_reward_pht?`${selected.estimated_reward_pht.toLocaleString()} PHT`:locale==="vi"?"Theo đối soát":"After validation"}</b></div><div className="rounded-2xl bg-amber-300/10 p-3"><small className="text-amber-100">{locale==="vi"?"Thời gian chờ":"Pending period"}</small><b className="mt-1 block text-lg text-amber-200">{selected.hold_days||5} {locale==="vi"?"ngày":"days"}</b></div></div><p className="mt-4 text-sm leading-6 text-slate-300">{selected.description||selected.reward_note}</p><h3 className="mt-5 font-bold">{locale==="vi"?"Cách hoàn thành":"How to complete"}</h3><ol className="mt-3 space-y-3">{(selected.instructions||[]).map((step,i)=><li key={i} className="flex gap-3 rounded-xl bg-white/5 p-3 text-sm leading-5"><b className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-violet-500 text-xs">{i+1}</b><span>{step}</span></li>)}</ol><div className="mt-4 rounded-xl border border-red-300/15 bg-red-300/5 p-3 text-xs leading-5 text-red-100">{locale==="vi"?"Chỉ người dùng mới đủ điều kiện. Cấm VPN, máy ảo, tài khoản trùng lặp và thông tin giả. Thưởng cuối cùng phụ thuộc dữ liệu đối soát AccessTrade.":"New eligible users only. VPN, emulators, duplicate accounts and false information are prohibited. Final reward depends on AccessTrade validation."}</div><button onClick={()=>{open(selected);setSelected(null)}} className="mt-4 w-full rounded-xl bg-gradient-to-r from-violet-500 to-fuchsia-500 p-4 font-black">{locale==="vi"?"Tôi đã hiểu · Bắt đầu làm":"I understand · Start offer"} ↗</button></section></div>}
     </>
   );
 }
@@ -1516,11 +1525,13 @@ function WalletView({
   txs,
   t,
   nav,
+  onUser,
 }: {
   user: User | null;
   txs: Tx[];
   t: Words;
   nav: (s: Screen) => void;
+  onUser: (user: User | null) => void;
 }) {
   const locale = user?.locale || "en",
     pc = payoutCopy[locale];
@@ -1533,6 +1544,7 @@ function WalletView({
     [account, setAccount] = useState(""),
     [bankName, setBankName] = useState(""),
     [accountName, setAccountName] = useState(""),
+    [swapAmount, setSwapAmount] = useState(""),
     [msg, setMsg] = useState("");
   const labels: Record<string, string> = {
     BANK_VN: pc.bank,
@@ -1552,7 +1564,7 @@ function WalletView({
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        phtAmount: amount,
+        usdAmount: amount,
         method,
         account,
         bankName,
@@ -1561,7 +1573,9 @@ function WalletView({
     });
     const d = await r.json();
     setMsg(r.ok ? t.requestSent : d.error || t.failed);
+    if(r.ok) onUser(user ? {...user,usdBalance:d.usdBalance} : user);
   }
+  async function swap(){const r=await fetch("/api/pht/swap",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({phtAmount:swapAmount})}),d=await r.json();setMsg(r.ok?`${Number(swapAmount).toLocaleString()} PHT → $${d.usd.toFixed(2)} USD`:d.error||t.failed);if(r.ok){onUser(user?{...user,phtBalance:d.phtBalance,usdBalance:d.usdBalance}:user);setSwapAmount("");}}
   const lv = tier(user?.totalEarnedPht);
   return (
     <>
@@ -1574,6 +1588,7 @@ function WalletView({
         <Stat n={lv.fee} l={t.fee} />
         <Stat n={lv.bonus} l={t.taskBonus} />
       </div>
+      <section className="card mt-3 overflow-hidden bg-gradient-to-br from-violet-500/15 to-emerald-400/10"><div className="flex items-center justify-between"><div><small className="text-slate-400">USD available</small><b className="block text-2xl text-emerald-300">${Number(user?.usdBalance||0).toFixed(2)}</b></div><ArrowDownToLine className="text-emerald-300"/></div><p className="mt-3 text-xs text-slate-400">1,000 PHT = $1.00 USD · {user?.locale==="vi"?"Đổi PHT sang USD trước khi rút tiền.":"Swap PHT to USD before requesting a payout."}</p><div className="mt-3 flex gap-2"><input type="number" min="100" step="1" value={swapAmount} onChange={e=>setSwapAmount(e.target.value)} className="field min-w-0 flex-1" placeholder="PHT"/><button onClick={()=>setSwapAmount(String(Math.floor(user?.phtBalance||0)))} className="rounded-xl bg-white/5 px-3 text-xs">MAX</button><button onClick={swap} className="rounded-xl bg-emerald-400 px-4 text-sm font-black text-[#10251e]">SWAP</button></div></section>
       <section className="card mt-3">
         <b>{t.cashout}</b>
         <p className="mt-1 text-xs text-slate-400">{t.min}</p>
@@ -1596,16 +1611,16 @@ function WalletView({
           <div className="mt-1 flex rounded-xl border border-white/10">
             <input
               type="number"
-              min="5000"
-              step="1"
+              min="5"
+              step="0.01"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               className="min-w-0 flex-1 bg-transparent p-3 outline-none"
-              placeholder="5000"
+              placeholder="5.00 USD"
             />
             <button
               onClick={() =>
-                setAmount(String(Math.floor(user?.phtBalance || 0)))
+                setAmount(String(Number(user?.usdBalance || 0).toFixed(2)))
               }
               className="px-3 text-violet-300"
             >

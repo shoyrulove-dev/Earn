@@ -15,22 +15,22 @@ export async function POST(request: Request) {
   const limited = await rateLimit("withdrawal", `${session.user.id}:${requestIp(request)}`, 5, 60 * 60 * 1000);
   if (!limited.allowed) return NextResponse.json({ error: "Too many withdrawal requests. Please try again later." }, { status: 429, headers: { "Retry-After": String(limited.retryAfter) } });
   const body = await request.json();
-  const amount = Math.floor(Number(body.phtAmount));
+  const amount = Math.floor(Number(body.usdAmount) * 100) / 100;
   const method = String(body.method || "");
   const account = String(body.account || "").trim();
-  if (!Number.isFinite(amount) || amount < MIN_WITHDRAW_PHT)
+  if (!Number.isFinite(amount) || amount < MIN_WITHDRAW_PHT / PHT_PER_USD)
     return NextResponse.json(
       {
-        error: `Minimum withdrawal is ${MIN_WITHDRAW_PHT.toLocaleString()} PHT`,
+        error: `Minimum withdrawal is $${MIN_WITHDRAW_PHT / PHT_PER_USD} USD. Swap PHT to USD first.`,
       },
       { status: 400 },
     );
   await connectDB();
   const current = (await User.findById(session.user.id)
-    .select("country phtBalance phtDebt totalEarnedPht emailVerifiedAt payoutDestinationChangedAt +payoutDestinationHash")
+    .select("country usdBalance phtDebt totalEarnedPht emailVerifiedAt payoutDestinationChangedAt +payoutDestinationHash")
     .lean()) as {
     country?: string;
-    phtBalance?: number;
+    usdBalance?: number;
     totalEarnedPht?: number;
     phtDebt?: number;
     emailVerifiedAt?: Date;
@@ -95,17 +95,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Withdrawals are temporarily locked after a payout detail change.", retryAt: new Date(new Date(current.payoutDestinationChangedAt).getTime() + 86400000) }, { status: 423 });
   if (!current.payoutDestinationHash) await User.findByIdAndUpdate(session.user.id, { $set: { payoutDestinationHash: destinationHash } });
   const tier = tierFor(Number(current.totalEarnedPht || 0));
-  const feePht = Math.floor(amount * tier.feeRate);
-  const netPht = amount - feePht;
-  const netUsd = netPht / PHT_PER_USD;
+  const feeUsd = Math.floor(amount * tier.feeRate * 100) / 100;
+  const netUsd = amount - feeUsd;
   const user = await User.findOneAndUpdate(
-    { _id: session.user.id, phtBalance: { $gte: amount } },
-    { $inc: { phtBalance: -amount } },
+    { _id: session.user.id, usdBalance: { $gte: amount } },
+    { $inc: { usdBalance: -amount } },
     { new: true },
   );
   if (!user)
     return NextResponse.json(
-      { error: "Insufficient PHT balance" },
+      { error: "Insufficient USD balance. Swap PHT to USD first." },
       { status: 400 },
     );
   const metadata = {
@@ -114,8 +113,7 @@ export async function POST(request: Request) {
     accountName: body.accountName,
     country: current.country,
     tier: tier.name,
-    feePht,
-    netPht,
+    feeUsd,
     netUsd,
     estimatedVnd: Math.floor(netUsd * VND_PER_USD),
     priority: tier.priority,
@@ -124,7 +122,7 @@ export async function POST(request: Request) {
   await Transaction.create({
     userId: user._id,
     type: "withdrawal",
-    currency: "PHT",
+    currency: "USD",
     amount: -amount,
     status: "pending",
     source: method,
@@ -141,9 +139,8 @@ export async function POST(request: Request) {
   });
   return NextResponse.json({
     ok: true,
-    phtBalance: user.phtBalance,
-    feePht,
-    netPht,
+    usdBalance: user.usdBalance,
+    feeUsd,
     netUsd,
     tier: tier.name,
   });
