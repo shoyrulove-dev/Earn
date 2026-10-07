@@ -386,6 +386,128 @@ const bingxCopy = {
     inactive: "La incorporación de BingX se está preparando.",
   },
 };
+const bingxProgramCopy = {
+  en: {
+    title: "BingX milestone rewards",
+    intro:
+      "Complete each verified milestone in order. BingX is optional and the program will open after the official tracking link is approved.",
+    coming: "Awaiting official affiliate tracking",
+    open: "Open BingX",
+    submit: "Submit proof",
+    uid: "Numeric BingX UID",
+    proofs: [
+      "KYC verification screenshot URL",
+      "Deposit and 3-day holding proof URL",
+      "Eligible trading-volume proof URL",
+    ],
+    names: [
+      "Register & verify KYC",
+      "Deposit at least 50 USDT",
+      "Reach 10,000 USDT volume",
+    ],
+    benefits: [
+      "Eligible new users may receive a Mystery Box worth at least 5 USDT.",
+      "Unlock the deposit milestone reward after reconciliation.",
+      "Trading reward is enabled only after official commission terms are confirmed.",
+    ],
+    states: {
+      pending: "Awaiting review",
+      approved: "Approved · reward pending",
+      rejected: "Rejected · submit new proof",
+      locked: "Complete the previous tier first",
+      soon: "Coming soon",
+    },
+  },
+  vi: {
+    title: "Thưởng theo mốc BingX",
+    intro:
+      "Hoàn thành lần lượt từng mốc đã xác minh. BingX không bắt buộc và chương trình sẽ mở khi liên kết tracking chính thức được duyệt.",
+    coming: "Đang chờ liên kết affiliate chính thức",
+    open: "Mở BingX",
+    submit: "Gửi bằng chứng",
+    uid: "UID BingX dạng số",
+    proofs: [
+      "Liên kết ảnh xác nhận KYC",
+      "Liên kết bằng chứng nạp và giữ tiền 3 ngày",
+      "Liên kết bằng chứng khối lượng giao dịch hợp lệ",
+    ],
+    names: [
+      "Đăng ký và xác minh KYC",
+      "Nạp tối thiểu 50 USDT",
+      "Đạt volume 10.000 USDT",
+    ],
+    benefits: [
+      "Người dùng mới đủ điều kiện có thể nhận Mystery Box trị giá ít nhất 5 USDT.",
+      "Mở khóa thưởng mốc nạp tiền sau khi đối soát.",
+      "Chỉ bật thưởng giao dịch sau khi xác nhận chính thức cơ chế hoa hồng.",
+    ],
+    states: {
+      pending: "Đang chờ duyệt",
+      approved: "Đã duyệt · thưởng đang chờ",
+      rejected: "Bị từ chối · gửi lại bằng chứng",
+      locked: "Cần hoàn thành cấp trước",
+      soon: "Sắp mở",
+    },
+  },
+  zh: {
+    title: "BingX 里程碑奖励",
+    intro:
+      "请按顺序完成并验证每个阶段。BingX 不是强制使用，官方跟踪链接获批后才会开放任务。",
+    coming: "正在等待官方推广跟踪链接",
+    open: "打开 BingX",
+    submit: "提交证明",
+    uid: "数字 BingX UID",
+    proofs: [
+      "KYC 验证截图链接",
+      "充值并持有 3 天的证明链接",
+      "有效交易量证明链接",
+    ],
+    names: ["注册并完成 KYC", "至少充值 50 USDT", "达到 10,000 USDT 交易量"],
+    benefits: [
+      "符合条件的新用户可获得价值至少 5 USDT 的神秘礼盒。",
+      "核对完成后解锁充值阶段奖励。",
+      "交易奖励仅在正式佣金条款确认后开放。",
+    ],
+    states: {
+      pending: "等待审核",
+      approved: "已批准 · 奖励待发放",
+      rejected: "已拒绝 · 请重新提交",
+      locked: "请先完成上一级",
+      soon: "即将开放",
+    },
+  },
+  es: {
+    title: "Recompensas por hitos de BingX",
+    intro:
+      "Completa cada hito verificado en orden. BingX es opcional y el programa se abrirá cuando se apruebe el enlace oficial de seguimiento.",
+    coming: "Esperando el enlace oficial de afiliado",
+    open: "Abrir BingX",
+    submit: "Enviar prueba",
+    uid: "UID numérico de BingX",
+    proofs: [
+      "URL de captura de KYC verificado",
+      "URL de prueba del depósito mantenido 3 días",
+      "URL de prueba del volumen válido",
+    ],
+    names: [
+      "Registrarse y verificar KYC",
+      "Depositar al menos 50 USDT",
+      "Alcanzar 10.000 USDT de volumen",
+    ],
+    benefits: [
+      "Los nuevos usuarios elegibles pueden recibir una Caja Misteriosa de al menos 5 USDT.",
+      "Desbloquea la recompensa de depósito tras la conciliación.",
+      "La recompensa de trading se habilitará tras confirmar las comisiones oficiales.",
+    ],
+    states: {
+      pending: "Pendiente de revisión",
+      approved: "Aprobado · recompensa pendiente",
+      rejected: "Rechazado · envía otra prueba",
+      locked: "Completa primero el nivel anterior",
+      soon: "Próximamente",
+    },
+  },
+};
 const bingxWalletTip = (locale: Locale) =>
   ({
     en: "Need a BSC wallet? BingX is optional — you may use any valid BSC address.",
@@ -1512,91 +1634,182 @@ function BingXTierOne({ locale }: { locale: Locale }) {
   const [config, setConfig] = useState<{
       active?: boolean;
       affiliateUrl?: string;
-      rewardPht?: number;
-      holdDays?: number;
       mysteryBox?: string;
+      tiers?: Record<
+        string,
+        {
+          active: boolean;
+          rewardPht: number;
+          holdDays: number;
+          requirement: string;
+        }
+      >;
     } | null>(null),
-    [submission, setSubmission] = useState<{ status?: string } | null>(null),
+    [submissions, setSubmissions] = useState<
+      Array<{
+        tier: number;
+        status: "pending" | "approved" | "rejected";
+        bingxUid?: string;
+      }>
+    >([]),
+    [selectedTier, setSelectedTier] = useState<number | null>(null),
     [uid, setUid] = useState(""),
     [proof, setProof] = useState(""),
     [turnstileToken, setTurnstileToken] = useState(""),
     [msg, setMsg] = useState(""),
-    c = bingxCopy[locale] || bingxCopy.en;
+    c = bingxProgramCopy[locale] || bingxProgramCopy.en;
   useEffect(() => {
     fetch("/api/bingx").then(async (r) => {
       if (r.ok) {
         const d = await r.json();
         setConfig(d.config);
-        setSubmission(d.submission);
+        setSubmissions(d.submissions || []);
+        const knownUid = d.submissions?.find(
+          (x: { bingxUid?: string }) => x.bingxUid,
+        )?.bingxUid;
+        if (knownUid) setUid(knownUid);
       }
     });
   }, []);
-  async function submit() {
+  async function submit(tier: number) {
     const r = await fetch("/api/bingx", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
+          tier,
           bingxUid: uid,
           proofImageUrl: proof,
           turnstileToken,
         }),
       }),
       d = await r.json();
-    setMsg(r.ok ? c.sent : d.error || "Error");
-    if (r.ok) setSubmission(d.submission);
+    setMsg(r.ok ? c.states.pending : d.error || "Error");
+    if (r.ok) {
+      setSubmissions((items) => [
+        ...items.filter((x) => x.tier !== tier),
+        d.submission,
+      ]);
+      setSelectedTier(null);
+      setProof("");
+    }
   }
-  if (!config?.active) return null;
+  const tiers = config?.tiers;
   return (
     <section className="mt-4 overflow-hidden rounded-2xl border border-cyan-300/20 bg-gradient-to-br from-[#241744] to-[#102c47] p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <span className="rounded-full bg-cyan-300/15 px-2 py-1 text-[10px] font-bold text-cyan-200">
-            KYC REQUIRED
+            BINGX · 3 TIERS
           </span>
-          <h3 className="mt-2 font-black">{c.title}</h3>
+          <h3 className="mt-2 text-lg font-black">{c.title}</h3>
         </div>
-        <b className="text-amber-300">+{config.rewardPht} PHT</b>
+        {!config?.active && (
+          <span className="rounded-full bg-amber-300/10 px-2 py-1 text-[10px] font-bold text-amber-200">
+            {c.coming}
+          </span>
+        )}
       </div>
-      <p className="mt-2 text-xs leading-5 text-cyan-50">{c.benefit}</p>
-      <p className="mt-2 text-[11px] leading-5 text-slate-300">{c.rule}</p>
-      <a
-        href={config.affiliateUrl}
-        target="_blank"
-        rel="noreferrer"
-        className="mt-3 block rounded-xl bg-cyan-400 p-3 text-center text-xs font-black text-[#101a2d]"
-      >
-        {c.open} ↗
-      </a>
-      {submission ? (
-        <p className="mt-3 rounded-xl bg-white/5 p-3 text-xs text-amber-200">
-          {c.sent}
-        </p>
-      ) : (
-        <>
-          <input
-            className="field mt-3"
-            inputMode="numeric"
-            value={uid}
-            onChange={(e) => setUid(e.target.value)}
-            placeholder={c.uid}
-          />
-          <input
-            className="field mt-2"
-            value={proof}
-            onChange={(e) => setProof(e.target.value)}
-            placeholder={c.proof}
-          />
-          <div className="mt-2">
-            <Turnstile onToken={setTurnstileToken} />
-          </div>
-          <button
-            onClick={submit}
-            className="mt-2 w-full rounded-xl bg-violet-500 p-3 text-xs font-bold"
-          >
-            {c.submit}
-          </button>
-        </>
-      )}
+      <p className="mt-2 text-xs leading-5 text-cyan-50">{c.intro}</p>
+      <div className="mt-4 space-y-2">
+        {([1, 2, 3] as const).map((tier) => {
+          const item = tiers?.[String(tier)];
+          const submission = submissions.find((x) => x.tier === tier);
+          const previousApproved =
+            tier === 1 ||
+            submissions.some(
+              (x) => x.tier === tier - 1 && x.status === "approved",
+            );
+          const enabled = Boolean(
+            config?.active && item?.active && previousApproved,
+          );
+          const state = submission
+            ? c.states[submission.status]
+            : !item?.active
+              ? c.states.soon
+              : !previousApproved
+                ? c.states.locked
+                : "";
+          return (
+            <article
+              key={tier}
+              className="rounded-2xl border border-white/10 bg-white/5 p-3"
+            >
+              <div className="flex items-start gap-3">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-500 font-black">
+                  {tier}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <b className="text-sm">{c.names[tier - 1]}</b>
+                  <p className="mt-1 text-[11px] leading-5 text-slate-300">
+                    {c.benefits[tier - 1]}
+                  </p>
+                  {item?.requirement && (
+                    <p className="mt-1 text-[10px] text-cyan-200">
+                      {item.requirement}
+                    </p>
+                  )}
+                </div>
+                <b className="whitespace-nowrap text-xs text-amber-300">
+                  {item?.rewardPht ? `+${item.rewardPht} PHT` : c.states.soon}
+                </b>
+              </div>
+              {state && (
+                <p className="mt-2 rounded-lg bg-black/15 p-2 text-[11px] text-amber-100">
+                  {state}
+                </p>
+              )}
+              {enabled && (!submission || submission.status === "rejected") && (
+                <button
+                  onClick={() =>
+                    setSelectedTier(selectedTier === tier ? null : tier)
+                  }
+                  className="mt-2 w-full rounded-lg bg-violet-500 p-2 text-xs font-bold"
+                >
+                  {c.submit}
+                </button>
+              )}
+              {selectedTier === tier &&
+                enabled &&
+                (!submission || submission.status === "rejected") && (
+                  <div className="mt-2 border-t border-white/10 pt-2">
+                    {tier === 1 && (
+                      <a
+                        href={config?.affiliateUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="block rounded-lg bg-cyan-400 p-2 text-center text-xs font-black text-[#101a2d]"
+                      >
+                        {c.open} ↗
+                      </a>
+                    )}
+                    <input
+                      className="field mt-2"
+                      inputMode="numeric"
+                      value={uid}
+                      onChange={(e) => setUid(e.target.value)}
+                      placeholder={c.uid}
+                    />
+                    <input
+                      className="field mt-2"
+                      value={proof}
+                      onChange={(e) => setProof(e.target.value)}
+                      placeholder={c.proofs[tier - 1]}
+                    />
+                    <div className="mt-2">
+                      <Turnstile onToken={setTurnstileToken} />
+                    </div>
+                    <button
+                      onClick={() => submit(tier)}
+                      className="mt-2 w-full rounded-lg bg-cyan-400 p-2 text-xs font-black text-[#101a2d]"
+                    >
+                      {c.submit}
+                    </button>
+                  </div>
+                )}
+            </article>
+          );
+        })}
+      </div>
       {msg && <p className="mt-2 text-xs text-violet-200">{msg}</p>}
     </section>
   );

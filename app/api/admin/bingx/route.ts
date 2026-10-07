@@ -7,6 +7,7 @@ import Transaction from "@/models/Transaction";
 import User from "@/models/User";
 import { tierFor } from "@/lib/pht";
 import { queueReferralReward } from "@/lib/referrals";
+import { normalizeBingXConfig } from "@/lib/bingx";
 
 async function admin() {
   const session = await getAuthSession();
@@ -24,7 +25,9 @@ export async function GET() {
       .lean(),
   ]);
   return NextResponse.json({
-    config: (setting as { value?: unknown } | null)?.value || {},
+    config: normalizeBingXConfig(
+      (setting as { value?: Record<string, unknown> } | null)?.value || {},
+    ),
     submissions,
   });
 }
@@ -32,18 +35,15 @@ export async function PUT(request: Request) {
   if (!(await admin()))
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const body = await request.json();
-  const value = {
-    affiliateId: String(body.affiliateId || "").trim(),
-    affiliateUrl: String(body.affiliateUrl || "").trim(),
-    active: Boolean(body.active && body.affiliateUrl),
-    autoAnnounce: Boolean(body.autoAnnounce),
-    rewardPht: Math.max(0, Math.floor(Number(body.rewardPht || 100))),
-    holdDays: Math.max(1, Math.floor(Number(body.holdDays || 7))),
-    mysteryBox: String(
-      body.mysteryBox ||
-        "Mystery Box worth at least 5 USDT for eligible new users",
-    ).trim(),
-  };
+  const value = normalizeBingXConfig(body);
+  const invalidTier = (["1", "2", "3"] as const).find(
+    (tier) => value.tiers[tier].active && value.tiers[tier].rewardPht <= 0,
+  );
+  if (invalidTier)
+    return NextResponse.json(
+      { error: `Tier ${invalidTier} needs a positive PHT reward before activation` },
+      { status: 400 },
+    );
   if (value.affiliateUrl) {
     try {
       new URL(value.affiliateUrl);
@@ -80,7 +80,7 @@ export async function PUT(request: Request) {
           headers: { "content-type": "application/json" },
           body: JSON.stringify({
             chat_id,
-            text: `🎁 BingX Tier 1 is live\n\nComplete registration and verified KYC to receive ${value.rewardPht} PHT from Pure Earn. Eligible new BingX users may also receive: ${value.mysteryBox}.\n\nOpen Pure Earn → Offers to participate.`,
+            text: `🎁 BingX Rewards is live\n\nTier 1: KYC · ${value.tiers["1"].rewardPht} PHT\nTier 2: Deposit · ${value.tiers["2"].rewardPht} PHT\nTier 3: Trading volume · ${value.tiers["3"].active ? `${value.tiers["3"].rewardPht} PHT` : "Coming soon"}\n\nEligible new users may also receive: ${value.mysteryBox}.\n\nOpen Pure Earn → Offers to participate.`,
             disable_web_page_preview: false,
           }),
         },
@@ -132,11 +132,12 @@ export async function PATCH(request: Request) {
       amount: rewardPht,
       status: "pending",
       availableAt: submission.releaseAt,
-      source: "bingx-tier-1",
-      reference: `bingx:tier1:${submission._id}`,
+      source: `bingx-tier-${submission.tier}`,
+      reference: `bingx:tier${submission.tier}:${submission._id}`,
       metadata: {
         bingxUid: submission.bingxUid,
-        kycVerified: true,
+        tier: submission.tier,
+        kycVerified: submission.tier === 1,
         holdDays: submission.holdDays,
         baseRewardPht: submission.rewardPht,
       },
