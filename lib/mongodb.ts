@@ -65,3 +65,8 @@ export async function connectDB() {
   cached.conn = await cached.promise;
   return cached.conn;
 }
+
+export async function getDatabaseConnection() {
+  await connectDB();
+  return getRequestDB()?.connection ?? mongoose.connection;
+}
