@@ -6,6 +6,7 @@ Worker: **earn**. Production hostname after verification: **earn.blissbiovn.com*
 
 - Repository: **shoyrulove-dev/Earn**. Use the repository root and Node.js 24.
 - Build: `npm run cf:build`. Deploy: `npm run cf:deploy`.
+- Set `NEXT_PUBLIC_TURNSTILE_SITE_KEY` in the build environment. The matching `TURNSTILE_SECRET_KEY` belongs only in Worker runtime secrets. Builds fail if the public key is missing so registration does not break silently.
 - The migration branch is separate from `main` so uncommitted local changes to rewards, settlement, and admin features are not published inadvertently. Configure production Builds for `main` after reviewing and merging the migration.
 - Install from the committed lockfile. Verify changes to the lockfile with npm 10.9.2, the npm version used by the current Workers Builds environment.
 

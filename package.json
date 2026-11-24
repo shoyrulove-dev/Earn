@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "cf:build": "opennextjs-cloudflare build --config wrangler.jsonc",
+    "cf:build": "node scripts/check-cloudflare-build.mjs && opennextjs-cloudflare build --config wrangler.jsonc",
     "cf:deploy": "opennextjs-cloudflare deploy --config wrangler.jsonc"
   },
   "dependencies": {
