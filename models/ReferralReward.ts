@@ -1,4 +1,5 @@
-import mongoose, { Schema, models } from "mongoose";
+import { scopedModel } from "../lib/mongodb";
+import { Schema} from "mongoose";
 
 const ReferralRewardSchema = new Schema(
   {
@@ -43,5 +44,4 @@ ReferralRewardSchema.index(
   { referredUserId: 1, kind: 1 },
   { unique: true, partialFilterExpression: { kind: "activation" } },
 );
-export default models.ReferralReward ||
-  mongoose.model("ReferralReward", ReferralRewardSchema);
+export default scopedModel("ReferralReward", ReferralRewardSchema);

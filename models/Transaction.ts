@@ -1,3 +1,4 @@
-import mongoose, { Schema, models } from "mongoose";
+import { scopedModel } from "../lib/mongodb";
+import { Schema} from "mongoose";
 const TransactionSchema = new Schema({ userId: { type: Schema.Types.ObjectId, ref: "User", required: true }, type: { type: String, enum: ["earning", "withdrawal", "refund", "referral", "checkin", "bonus", "swap"], required: true }, currency: { type: String, enum: ["PHT", "USD"], default: "PHT" }, amount: { type: Number, required: true }, status: { type: String, enum: ["pending", "approved", "rejected"], default: "pending" }, availableAt: Date, source: String, reference: { type: String, unique: true, sparse: true }, metadata: Schema.Types.Mixed }, { timestamps: true });
-export default models.Transaction || mongoose.model("Transaction", TransactionSchema);
+export default scopedModel("Transaction", TransactionSchema);

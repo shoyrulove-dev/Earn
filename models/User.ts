@@ -1,4 +1,5 @@
-import mongoose, { Schema, models } from "mongoose";
+import { scopedModel } from "../lib/mongodb";
+import { Schema} from "mongoose";
 
 const UserSchema = new Schema(
   {
@@ -53,4 +54,4 @@ const UserSchema = new Schema(
   },
   { timestamps: true },
 );
-export default models.User || mongoose.model("User", UserSchema);
+export default scopedModel("User", UserSchema);

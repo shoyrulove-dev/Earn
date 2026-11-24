@@ -1,4 +1,5 @@
-import mongoose, { Schema, models } from "mongoose";
+import { scopedModel } from "../lib/mongodb";
+import { Schema} from "mongoose";
 
 const BingXSubmissionSchema = new Schema({
   userId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
@@ -16,4 +17,4 @@ const BingXSubmissionSchema = new Schema({
 
 BingXSubmissionSchema.index({ tier: 1, bingxUid: 1 }, { unique: true });
 BingXSubmissionSchema.index({ userId: 1, tier: 1 }, { unique: true });
-export default models.BingXSubmission || mongoose.model("BingXSubmission", BingXSubmissionSchema);
+export default scopedModel("BingXSubmission", BingXSubmissionSchema);

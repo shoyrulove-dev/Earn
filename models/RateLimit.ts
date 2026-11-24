@@ -1,4 +1,5 @@
-import mongoose, { Schema, models } from "mongoose";
+import { scopedModel } from "../lib/mongodb";
+import { Schema} from "mongoose";
 
 const RateLimitSchema = new Schema({
   key: { type: String, required: true, unique: true, index: true },
@@ -6,4 +7,4 @@ const RateLimitSchema = new Schema({
   resetAt: { type: Date, required: true, index: { expires: 0 } },
 });
 
-export default models.RateLimit || mongoose.model("RateLimit", RateLimitSchema);
+export default scopedModel("RateLimit", RateLimitSchema);

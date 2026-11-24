@@ -1,0 +1,15 @@
+{
+  "name": "earn",
+  "main": "cloudflare-worker.mjs",
+  "compatibility_date": "2026-11-24",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "workers_dev": true,
+  "preview_urls": false,
+  "triggers": { "crons": [] }
+}
