@@ -15,29 +15,29 @@ export type BingXConfig = {
 };
 
 export const BINGX_DEFAULTS: BingXConfig = {
-  affiliateId: "",
-  affiliateUrl: "",
-  active: false,
+  affiliateId: "1FNYBD",
+  affiliateUrl: "https://bingxdao.com/invite/1FNYBD/",
+  active: true,
   autoAnnounce: true,
   mysteryBox: "Mystery Box worth at least 5 USDT for eligible new users",
   tiers: {
     "1": {
       active: true,
-      rewardPht: 100,
+      rewardPht: 50,
       holdDays: 7,
-      requirement: "Register through Pure Earn and complete verified KYC",
+      requirement: "Đăng ký qua Pure Earn và hoàn tất KYC được xác minh",
     },
     "2": {
       active: true,
       rewardPht: 1500,
       holdDays: 14,
-      requirement: "Deposit at least 50 USDT and keep it for 3 days",
+      requirement: "Đang chờ xác minh điều kiện sự kiện BingX hiện hành",
     },
     "3": {
       active: false,
       rewardPht: 0,
       holdDays: 14,
-      requirement: "Reach at least 10,000 USDT in eligible trading volume",
+      requirement: "Đang chờ xác minh điều kiện tier 3 từ BingX",
     },
   },
 };
@@ -90,11 +90,11 @@ export function normalizeBingXConfig(
       ];
     }),
   ) as BingXConfig["tiers"];
-  const affiliateUrl = String(raw.affiliateUrl || "").trim();
+  const affiliateUrl = String(raw.affiliateUrl || BINGX_DEFAULTS.affiliateUrl).trim();
   return {
-    affiliateId: String(raw.affiliateId || "").trim(),
+    affiliateId: String(raw.affiliateId || BINGX_DEFAULTS.affiliateId).trim(),
     affiliateUrl,
-    active: Boolean(raw.active && affiliateUrl),
+    active: Boolean((raw.active ?? BINGX_DEFAULTS.active) && affiliateUrl),
     autoAnnounce: Boolean(raw.autoAnnounce ?? true),
     mysteryBox: String(raw.mysteryBox || BINGX_DEFAULTS.mysteryBox).trim(),
     tiers,

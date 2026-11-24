@@ -1,524 +1,118 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { signOut } from "next-auth/react";
+import Link from "next/link";
 import {
-  BriefcaseBusiness,
-  ClipboardCheck,
-  RefreshCw,
-  Send,
-  ShieldCheck,
-  Users,
+  Activity, BadgeDollarSign, BarChart3, BellRing, Check, ChevronRight,
+  CircleDollarSign, Clock3, ExternalLink, FileCheck2, Gift, Headphones,
+  LayoutDashboard, LogOut, Megaphone, Pencil, RefreshCw, Save, Search, Send,
+  Settings2, ShieldCheck, Sparkles, Trash2, TrendingUp, UserPlus, UserRound, UserX, Users, WalletCards, X,
 } from "lucide-react";
 import { BINGX_DEFAULTS, type BingXConfig } from "@/lib/bingx";
 
-type Submission = {
-  _id: string;
-  proofUrl: string;
-  userId?: { email?: string; name?: string };
-  minijobId?: { title?: string; reward?: number };
-};
-type Stats = { users: number; minijobs: number; pending: number };
-type BingXSubmission = {
-  _id: string;
-  tier: number;
-  bingxUid: string;
-  proofImageUrl: string;
-  rewardPht: number;
-  holdDays: number;
-  userId?: { email?: string; name?: string; userId?: string };
-};
-type AdminTransaction = {
-  _id: string;
-  type: string;
-  amount: number;
-  source?: string;
-  status: string;
-  createdAt: string;
-  userId?: { email?: string; name?: string; country?: string };
-  metadata?: {
-    netPht?: number;
-    netUsd?: number;
-    account?: string;
-    bankName?: string;
-    accountName?: string;
-  };
-};
+type View = "overview" | "reviews" | "campaigns" | "members" | "support" | "security" | "profile";
+type Submission = { _id:string; proofUrl:string; userId?:{email?:string;name?:string}; minijobId?:{title?:string;reward?:number} };
+type Tx = { _id:string; type:string; amount:number; source?:string; status:string; currency?:string; createdAt:string; userId?:{email?:string;name?:string;country?:string}; metadata?:{transId?:string;amountUsd?:number;account?:string;bankName?:string;accountName?:string} };
+type BingXSubmission = { _id:string;tier:number;bingxUid:string;proofImageUrl:string;rewardPht:number;holdDays:number;userId?:{email?:string;name?:string} };
+type Member = { _id:string;name?:string;email?:string;username?:string;country?:string;memberLevel?:string;role?:string;accountStatus?:string;createdAt:string;totalEarnedPht?:number;phtBalance?:number;pendingPht?:number;usdBalance?:number;peBalance?:number };
+type Day = { date:string;approved:number;pending:number;count:number };
+type Audit = { _id:string;action:string;target?:string;ip?:string;createdAt:string;actorId?:{name?:string;email?:string} };
+type Stats = { users:number;activeUsers:number;minijobs:number;pending:number;pendingPayments:number;balances:{availablePht:number;pendingPht:number;paidPht:number};recentUsers:Member[];daily:Day[];audit:Audit[] };
+
+const menu = [
+  ["overview", "Overview", LayoutDashboard], ["reviews", "Reviews & payouts", FileCheck2],
+  ["campaigns", "Campaigns", Gift], ["members", "Members", Users],
+  ["support", "Support", Headphones], ["security", "Security", ShieldCheck], ["profile", "Profile", UserRound],
+] as const;
 
 export default function AdminPage() {
-  const [items, setItems] = useState<Submission[]>([]);
-  const [stats, setStats] = useState<Stats | null>(null);
-  const [message, setMessage] = useState("");
-  const [telegramText, setTelegramText] = useState("");
-  const [telegramTarget, setTelegramTarget] = useState("news");
-  const [telegramReady, setTelegramReady] = useState(false);
-  const [sending, setSending] = useState(false);
-  const [bingx, setBingx] = useState<BingXConfig>(BINGX_DEFAULTS);
-  const [bingxItems, setBingxItems] = useState<BingXSubmission[]>([]);
-  const [transactions, setTransactions] = useState<AdminTransaction[]>([]);
-  const [totp, setTotp] = useState("");
+  const [view,setView]=useState<View>("overview"),[items,setItems]=useState<Submission[]>([]),[stats,setStats]=useState<Stats|null>(null);
+  const [transactions,setTransactions]=useState<Tx[]>([]),[bingx,setBingx]=useState<BingXConfig>(BINGX_DEFAULTS),[bingxItems,setBingxItems]=useState<BingXSubmission[]>([]);
+  const [message,setMessage]=useState(""),[loading,setLoading]=useState(true),[query,setQuery]=useState(""),[totp,setTotp]=useState("");
+  const [members,setMembers]=useState<Member[]>([]),[editingMember,setEditingMember]=useState<Member|null>(null);
+  const [telegramText,setTelegramText]=useState(""),[telegramTarget,setTelegramTarget]=useState("news"),[telegramReady,setTelegramReady]=useState(false),[sending,setSending]=useState(false);
 
-  async function load() {
-    const [submissions, summary, telegram, bingxData, transactionData] =
-      await Promise.all([
-        fetch("/api/admin/submissions"),
-        fetch("/api/admin/stats"),
-        fetch("/api/admin/telegram"),
-        fetch("/api/admin/bingx"),
-        fetch("/api/admin/transactions"),
-      ]);
-    if (!submissions.ok) return setMessage("Admin access required");
-    setItems((await submissions.json()).submissions || []);
-    if (summary.ok) setStats(await summary.json());
-    if (telegram.ok) setTelegramReady((await telegram.json()).configured);
-    if (bingxData.ok) {
-      const d = await bingxData.json();
-      setBingx((x) => ({ ...x, ...d.config }));
-      setBingxItems(d.submissions || []);
-    }
-    if (transactionData.ok)
-      setTransactions((await transactionData.json()).transactions || []);
+  async function load(){ setLoading(true); const results=await Promise.all([fetch("/api/admin/submissions"),fetch("/api/admin/stats"),fetch("/api/admin/telegram"),fetch("/api/admin/bingx"),fetch("/api/admin/transactions"),fetch("/api/admin/members")]);
+    if(!results[0].ok){setMessage("Your session has expired. Please sign in again.");setLoading(false);return}
+    setItems((await results[0].json()).submissions||[]); if(results[1].ok)setStats(await results[1].json()); if(results[2].ok)setTelegramReady((await results[2].json()).configured);
+    if(results[3].ok){const d=await results[3].json();setBingx((old)=>({...old,...d.config}));setBingxItems(d.submissions||[])} if(results[4].ok)setTransactions((await results[4].json()).transactions||[]);if(results[5].ok)setMembers((await results[5].json()).members||[]);setLoading(false);
   }
-
-  async function review(id: string, status: "approved" | "rejected") {
-    const res = await fetch("/api/admin/submissions", {
-      method: "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ id, status }),
-    });
-    if (res.ok) {
-      setMessage(`Submission ${status}`);
-      load();
-    } else setMessage("Review failed");
-  }
-
-  async function publish() {
-    setSending(true);
-    setMessage("");
-    const res = await fetch("/api/admin/telegram", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ text: telegramText, target: telegramTarget }),
-    });
-    const data = await res.json();
-    setMessage(
-      res.ok
-        ? "Telegram post published successfully."
-        : data.error || "Telegram publish failed",
-    );
-    if (res.ok) setTelegramText("");
-    setSending(false);
-  }
-  async function testTelegram() {
-    const r = await fetch("/api/admin/telegram", { method: "PUT" }),
-      d = await r.json();
-    setMessage(
-      r.ok && d.ok
-        ? `Telegram ready: ${d.bot}`
-        : d.error ||
-            `Bot lacks admin rights: ${JSON.stringify(d.checks || [])}`,
-    );
-  }
-  async function saveBingX() {
-    const r = await fetch("/api/admin/bingx", {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(bingx),
-      }),
-      d = await r.json();
-    setMessage(r.ok ? "BingX settings saved." : d.error || "Save failed");
-    if (r.ok) load();
-  }
-  async function reviewBingX(id: string, status: "approved" | "rejected") {
-    const r = await fetch("/api/admin/bingx", {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ id, status }),
-      }),
-      d = await r.json();
-    setMessage(
-      r.ok ? `BingX submission ${status}.` : d.error || "Review failed",
-    );
-    if (r.ok) load();
-  }
-  async function reviewTransaction(
-    id: string,
-    status: "approved" | "rejected",
-  ) {
-    const r = await fetch("/api/admin/transactions", {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ id, status, totp }),
-      }),
-      d = await r.json();
-    setMessage(r.ok ? `Transaction ${status}.` : d.error || "Review failed");
-    if (r.ok) {
-      setTotp("");
-      load();
-    }
-  }
-
-  useEffect(() => {
-    load();
-  }, []);
-
-  return (
-    <main className="min-h-screen bg-[#100b1f] p-5 text-white md:p-10">
-      <div className="mx-auto max-w-6xl">
-        <header className="flex items-center justify-between">
-          <div>
-            <p className="flex items-center gap-2 text-xs uppercase tracking-[.24em] text-violet-300">
-              <ShieldCheck size={16} /> Pure Earn Admin
-            </p>
-            <h1 className="mt-2 text-3xl font-bold">Operations dashboard</h1>
-            <p className="mt-2 text-slate-400">
-              Manage rewards, proofs and official communications.
-            </p>
-          </div>
-          <button
-            onClick={load}
-            className="rounded-xl border border-white/10 p-3 text-slate-300"
-          >
-            <RefreshCw size={18} />
-          </button>
-        </header>
-        {message && (
-          <p className="mt-5 rounded-xl border border-violet-400/20 bg-violet-400/10 p-3 text-sm text-violet-100">
-            {message}
-          </p>
-        )}
-        <section className="mt-8 grid grid-cols-2 gap-3 md:grid-cols-4">
-          <Stat
-            icon={<Users />}
-            label="Users"
-            value={String(stats?.users ?? "—")}
-          />
-          <Stat
-            icon={<BriefcaseBusiness />}
-            label="Active minijobs"
-            value={String(stats?.minijobs ?? "—")}
-          />
-          <Stat
-            icon={<ClipboardCheck />}
-            label="Pending proofs"
-            value={String(stats?.pending ?? items.length)}
-          />
-          <Stat icon={<ShieldCheck />} label="System" value="Online" />
-        </section>
-
-        <section className="mt-8 rounded-2xl border border-white/10 bg-[#211737] p-5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="text-xl font-semibold">Telegram Publisher</h2>
-              <p className="mt-1 text-sm text-slate-400">
-                Publish announcements to Pure Earn News and Community.
-              </p>
-            </div>
-            <span
-              className={`rounded-full px-3 py-1 text-xs ${telegramReady ? "bg-emerald-400/15 text-emerald-300" : "bg-amber-400/15 text-amber-200"}`}
-            >
-              {telegramReady ? "Bot connected" : "Token required"}
-            </span>
-          </div>
-          <div className="mt-4 flex flex-wrap gap-2">
-            {[
-              ["news", "News · @pureearnglobal"],
-              ["community", "Community · @pureearngroup"],
-              ["both", "Post to both"],
-            ].map(([key, label]) => (
-              <button
-                key={key}
-                onClick={() => setTelegramTarget(key)}
-                className={`rounded-xl px-4 py-2 text-sm ${telegramTarget === key ? "bg-violet-500" : "bg-white/5"}`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          <textarea
-            value={telegramText}
-            onChange={(e) => setTelegramText(e.target.value)}
-            maxLength={4096}
-            rows={6}
-            className="field mt-3 resize-y"
-            placeholder="Write an announcement..."
-          />
-          <div className="mt-2 flex items-center justify-between">
-            <button
-              onClick={testTelegram}
-              className="rounded-xl border border-white/10 px-4 py-2 text-xs"
-            >
-              Test bot & admin rights
-            </button>
-            <small className="text-slate-500">{telegramText.length}/4096</small>
-            <button
-              disabled={sending || !telegramText.trim()}
-              onClick={publish}
-              className="flex items-center gap-2 rounded-xl bg-violet-500 px-5 py-3 text-sm font-bold disabled:opacity-40"
-            >
-              <Send size={16} />
-              {sending ? "Publishing..." : "Publish"}
-            </button>
-          </div>
-        </section>
-
-        <section className="mt-8 rounded-2xl border border-cyan-300/15 bg-[#18243b] p-5">
-          <h2 className="text-xl font-semibold">BingX tiered program</h2>
-          <p className="mt-1 text-sm text-slate-400">
-            Configure KYC, deposit and trading-volume milestones. Every tier is
-            manually reconciled before its reward enters the pending balance.
-          </p>
-          <div className="mt-4 grid gap-3 md:grid-cols-2">
-            <input
-              className="field"
-              value={bingx.affiliateId || ""}
-              onChange={(e) =>
-                setBingx({ ...bingx, affiliateId: e.target.value })
-              }
-              placeholder="BingX affiliate ID / code"
-            />
-            <input
-              className="field"
-              value={bingx.affiliateUrl || ""}
-              onChange={(e) =>
-                setBingx({ ...bingx, affiliateUrl: e.target.value })
-              }
-              placeholder="https://bingx.com/invite/..."
-            />
-            <input
-              className="field md:col-span-2"
-              value={bingx.mysteryBox || ""}
-              onChange={(e) =>
-                setBingx({ ...bingx, mysteryBox: e.target.value })
-              }
-              placeholder="Partner benefit disclosure"
-            />
-            <div className="grid gap-3 md:col-span-2 md:grid-cols-3">
-              {([1, 2, 3] as const).map((tier) => {
-                const key = String(tier) as "1" | "2" | "3";
-                const item = bingx.tiers[key];
-                return (
-                  <div
-                    key={key}
-                    className="rounded-xl border border-white/10 bg-black/10 p-3"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <b>Tier {tier}</b>
-                      <label className="flex items-center gap-2 text-xs">
-                        <input
-                          type="checkbox"
-                          checked={item.active}
-                          onChange={(e) =>
-                            setBingx({
-                              ...bingx,
-                              tiers: {
-                                ...bingx.tiers,
-                                [key]: { ...item, active: e.target.checked },
-                              },
-                            })
-                          }
-                        />
-                        Active
-                      </label>
-                    </div>
-                    <input
-                      className="field mt-3"
-                      type="number"
-                      min="0"
-                      value={item.rewardPht}
-                      onChange={(e) =>
-                        setBingx({
-                          ...bingx,
-                          tiers: {
-                            ...bingx.tiers,
-                            [key]: {
-                              ...item,
-                              rewardPht: Number(e.target.value),
-                            },
-                          },
-                        })
-                      }
-                      placeholder="Reward PHT"
-                    />
-                    <input
-                      className="field mt-2"
-                      type="number"
-                      min="1"
-                      max="60"
-                      value={item.holdDays}
-                      onChange={(e) =>
-                        setBingx({
-                          ...bingx,
-                          tiers: {
-                            ...bingx.tiers,
-                            [key]: {
-                              ...item,
-                              holdDays: Number(e.target.value),
-                            },
-                          },
-                        })
-                      }
-                      placeholder="Hold days"
-                    />
-                    <textarea
-                      className="field mt-2 resize-y"
-                      rows={3}
-                      value={item.requirement}
-                      onChange={(e) =>
-                        setBingx({
-                          ...bingx,
-                          tiers: {
-                            ...bingx.tiers,
-                            [key]: { ...item, requirement: e.target.value },
-                          },
-                        })
-                      }
-                      placeholder="Requirement"
-                    />
-                  </div>
-                );
-              })}
-            </div>
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={Boolean(bingx.active)}
-                onChange={(e) =>
-                  setBingx({ ...bingx, active: e.target.checked })
-                }
-              />{" "}
-              Publish program after affiliate URL is saved
-            </label>
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={Boolean(bingx.autoAnnounce)}
-                onChange={(e) =>
-                  setBingx({ ...bingx, autoAnnounce: e.target.checked })
-                }
-              />{" "}
-              Auto-post to Pure Earn News on first activation or link change
-            </label>
-            <button
-              onClick={saveBingX}
-              className="rounded-xl bg-cyan-400 px-5 py-3 text-sm font-bold text-[#101a2d] md:col-span-2"
-            >
-              Save BingX program
-            </button>
-          </div>
-          <div className="mt-6 space-y-3">
-            {bingxItems.map((x) => (
-              <article
-                key={x._id}
-                className="rounded-xl border border-white/10 p-4"
-              >
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <b>{x.userId?.email || x.userId?.name}</b>
-                    <p className="text-sm text-slate-400">
-                      Tier {x.tier} · UID: {x.bingxUid} · {x.rewardPht} PHT ·{" "}
-                      {x.holdDays} days
-                    </p>
-                    <a
-                      href={x.proofImageUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-xs text-cyan-300 underline"
-                    >
-                      Open Tier {x.tier} proof
-                    </a>
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => reviewBingX(x._id, "rejected")}
-                      className="rounded-lg border border-red-400/30 px-3 py-2 text-sm text-red-300"
-                    >
-                      Reject
-                    </button>
-                    <button
-                      onClick={() => reviewBingX(x._id, "approved")}
-                      className="rounded-lg bg-cyan-400 px-3 py-2 text-sm font-bold text-[#101a2d]"
-                    >
-                      Approve Tier {x.tier}
-                    </button>
-                  </div>
-                </div>
-              </article>
-            ))}
-          </div>
-        </section>
-
-        <section className="mt-8 rounded-2xl border border-white/10 bg-[#211737] p-5">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold">Pending proof reviews</h2>
-            <span className="rounded-full bg-violet-500/20 px-3 py-1 text-xs text-violet-200">
-              {items.length} pending
-            </span>
-          </div>
-          <div className="mt-5 space-y-3">
-            {items.length === 0 ? (
-              <p className="rounded-xl border border-dashed border-white/10 p-8 text-center text-slate-500">
-                No pending submissions.
-              </p>
-            ) : (
-              items.map((item) => (
-                <article
-                  key={item._id}
-                  className="flex flex-col gap-4 rounded-xl border border-white/10 p-4 md:flex-row md:items-center md:justify-between"
-                >
-                  <div>
-                    <p className="font-medium">
-                      {item.minijobId?.title || "Minijob submission"}
-                    </p>
-                    <p className="mt-1 text-sm text-slate-400">
-                      {item.userId?.email || item.userId?.name || "User"}
-                    </p>
-                    <a
-                      className="mt-2 inline-block text-xs text-violet-300 underline"
-                      href={item.proofUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      Open proof
-                    </a>
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => review(item._id, "rejected")}
-                      className="rounded-lg border border-red-400/30 px-3 py-2 text-sm text-red-300"
-                    >
-                      Reject
-                    </button>
-                    <button
-                      onClick={() => review(item._id, "approved")}
-                      className="rounded-lg bg-violet-500 px-3 py-2 text-sm font-semibold"
-                    >
-                      Approve
-                    </button>
-                  </div>
-                </article>
-              ))
-            )}
-          </div>
-        </section>
+  useEffect(()=>{load();const limit=15*60*1000;let timer:number;const reset=()=>{clearTimeout(timer);timer=window.setTimeout(()=>signOut({callbackUrl:"/"}),limit)};["click","keydown","mousemove","scroll","touchstart"].forEach(e=>window.addEventListener(e,reset,{passive:true}));reset();return()=>{clearTimeout(timer);["click","keydown","mousemove","scroll","touchstart"].forEach(e=>window.removeEventListener(e,reset))}},[]);
+  async function patch(url:string,id:string,status:"approved"|"rejected",extra={}){if(!confirm(status==="approved"?"Approve this transaction?":"Reject and reverse this transaction?"))return;const r=await fetch(url,{method:"PATCH",headers:{"content-type":"application/json"},body:JSON.stringify({id,status,...extra})});const d=await r.json();setMessage(r.ok?(status==="approved"?"Approved.":"Rejected and balance updated."):d.error||"Action failed.");if(r.ok){setTotp("");load()}}
+  async function saveBingX(){const r=await fetch("/api/admin/bingx",{method:"PUT",headers:{"content-type":"application/json"},body:JSON.stringify(bingx)});const d=await r.json();setMessage(r.ok?"BingX campaign saved.":d.error||"Save failed.");if(r.ok)load()}
+  async function publish(){setSending(true);const r=await fetch("/api/admin/telegram",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({text:telegramText,target:telegramTarget})});const d=await r.json();setMessage(r.ok?"Message sent.":d.error||"Send failed.");if(r.ok)setTelegramText("");setSending(false)}
+  async function saveMember(member:Member){const r=await fetch("/api/admin/members",{method:"PATCH",headers:{"content-type":"application/json"},body:JSON.stringify({id:member._id,name:member.name,memberLevel:member.memberLevel,accountStatus:member.accountStatus,phtBalance:member.phtBalance,pendingPht:member.pendingPht,usdBalance:member.usdBalance,peBalance:member.peBalance})});const d=await r.json();setMessage(r.ok?"Member updated.":d.error||"Update failed.");if(r.ok){setEditingMember(null);load()}}
+  async function deleteMember(member:Member){if(!confirm(`Delete ${member.email||member.name}? This also removes their transactions and proofs.`))return;const r=await fetch("/api/admin/members",{method:"DELETE",headers:{"content-type":"application/json"},body:JSON.stringify({id:member._id})});const d=await r.json();setMessage(r.ok?"Member deleted.":d.error||"Delete failed.");if(r.ok)load()}
+  const pendingCpx=transactions.filter(x=>x.source==="cpx"&&x.status==="pending"), withdrawals=transactions.filter(x=>x.type==="withdrawal"&&x.status==="pending");
+  const filteredMembers=members.filter(x=>`${x.name} ${x.email} ${x.username} ${x.country}`.toLowerCase().includes(query.toLowerCase()));
+  return <main className="min-h-screen bg-[#0e091b] text-white">
+    <div className="mx-auto flex min-h-screen max-w-[1500px]">
+      <aside className="hidden w-64 shrink-0 border-r border-white/10 bg-[#151025] p-5 lg:flex lg:flex-col">
+        <div className="flex items-center gap-3"><span className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-violet-500 to-fuchsia-500 shadow-lg shadow-violet-950"><Sparkles/></span><div><b>PURE EARN</b><p className="text-[10px] uppercase tracking-[.18em] text-violet-300">Control center</p></div></div>
+        <nav className="mt-8 space-y-1">{menu.map(([key,label,Icon])=><button key={key} onClick={()=>setView(key)} className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm transition ${view===key?"bg-gradient-to-r from-violet-500/25 to-fuchsia-500/10 text-white ring-1 ring-violet-400/25":"text-slate-400 hover:bg-white/5 hover:text-white"}`}><Icon size={18}/><span className="flex-1">{label}</span>{view===key&&<ChevronRight size={14}/>}</button>)}</nav>
+        <div className="mt-auto rounded-2xl border border-emerald-300/15 bg-emerald-300/5 p-3"><div className="flex items-center gap-2 text-xs text-emerald-300"><Activity size={14}/> System online</div><p className="mt-2 text-[10px] leading-4 text-slate-500">Auto sign-out after 15 minutes.</p></div>
+        <button onClick={()=>signOut({callbackUrl:"/"})} className="mt-3 flex items-center gap-2 rounded-xl px-3 py-2 text-xs text-slate-400 hover:bg-white/5"><LogOut size={15}/> Sign out</button>
+      </aside>
+      <div className="min-w-0 flex-1">
+        <header className="sticky top-0 z-30 border-b border-white/10 bg-[#130d24]/90 px-4 py-4 backdrop-blur-xl md:px-7"><div className="flex items-center gap-3"><div className="min-w-0 flex-1"><p className="text-[10px] font-bold uppercase tracking-[.18em] text-violet-300">Admin panel</p><h1 className="truncate text-xl font-black">{menu.find(x=>x[0]===view)?.[1]}</h1></div><IconButton title="Refresh" onClick={load}><RefreshCw size={18} className={loading?"animate-spin":""}/></IconButton><IconButton title="Notifications"><BellRing size={18}/></IconButton><Link href="/dashboard" title="Member site" className="grid h-10 w-10 place-items-center rounded-xl border border-white/10 bg-white/5 text-slate-300 hover:text-white"><ExternalLink size={17}/></Link></div>
+          <nav className="mt-3 flex gap-2 overflow-x-auto lg:hidden">{menu.map(([key,label,Icon])=><button key={key} onClick={()=>setView(key)} className={`flex shrink-0 items-center gap-2 rounded-xl px-3 py-2 text-xs ${view===key?"bg-violet-500":"bg-white/5 text-slate-400"}`}><Icon size={14}/>{label}</button>)}</nav></header>
+        <div className="p-4 md:p-7">{message&&<div className="mb-5 flex items-center gap-3 rounded-2xl border border-violet-300/20 bg-violet-400/10 px-4 py-3 text-sm text-violet-100"><Sparkles size={16}/><span className="flex-1">{message}</span><button onClick={()=>setMessage("")}><X size={15}/></button></div>}
+          {view==="overview"&&<Overview stats={stats} pending={items.length+bingxItems.length+pendingCpx.length} setView={setView}/>}
+          {view==="reviews"&&<Reviews items={items} bingxItems={bingxItems} cpx={pendingCpx} withdrawals={withdrawals} totp={totp} setTotp={setTotp} patch={patch}/>}
+          {view==="campaigns"&&<Campaigns bingx={bingx} setBingx={setBingx} save={saveBingX}/>}
+          {view==="members"&&<Members stats={stats} members={filteredMembers} query={query} setQuery={setQuery} edit={setEditingMember} remove={deleteMember}/>}
+          {view==="support"&&<Support ready={telegramReady} text={telegramText} setText={setTelegramText} target={telegramTarget} setTarget={setTelegramTarget} sending={sending} publish={publish}/>}
+          {view==="security"&&<Security stats={stats}/>}
+          {view==="profile"&&<Profile/>}
+          {editingMember&&<MemberEditor member={editingMember} setMember={setEditingMember} close={()=>setEditingMember(null)} save={saveMember}/>}
+        </div>
       </div>
-    </main>
-  );
+    </div>
+  </main>;
 }
 
-function Stat({
-  icon,
-  label,
-  value,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="rounded-2xl border border-white/10 bg-[#211737] p-4">
-      <div className="text-violet-300">{icon}</div>
-      <p className="mt-4 text-xs text-slate-500">{label}</p>
-      <p className="mt-1 text-xl font-bold">{value}</p>
-    </div>
-  );
-}
+function Overview({stats,pending,setView}:{stats:Stats|null;pending:number;setView:(v:View)=>void}){return <div className="space-y-6">
+  <section className="grid grid-cols-2 gap-3 xl:grid-cols-4"><Metric icon={Users} label="Total members" value={fmt(stats?.users)} note={`${stats?.activeUsers||0} active today`} color="violet"/><Metric icon={FileCheck2} label="Needs review" value={fmt(pending)} note="Proofs and reconciliation" color="amber"/><Metric icon={WalletCards} label="Pending payouts" value={fmt(stats?.pendingPayments)} note="Withdrawal requests" color="cyan"/><Metric icon={TrendingUp} label="Rewards issued" value={`${compact(stats?.balances.paidPht)} PHT`} note="All member rewards" color="emerald"/></section>
+  <section className="grid gap-5 xl:grid-cols-[1.6fr_1fr]"><Panel title="Task rewards · 7 days" subtitle="Approved and pending by day" action={<BarChart3 size={18} className="text-violet-300"/>}><RewardChart days={stats?.daily||[]}/></Panel><Panel title="Balance overview" subtitle="System reward liabilities"><div className="mt-5 space-y-4"><Progress label="Member available PHT" value={stats?.balances.availablePht||0} total={(stats?.balances.paidPht||1)} color="bg-emerald-400"/><Progress label="Pending PHT" value={stats?.balances.pendingPht||0} total={(stats?.balances.paidPht||1)} color="bg-amber-300"/><div className="grid grid-cols-2 gap-2 pt-2"><Quick icon={FileCheck2} label="Review rewards" onClick={()=>setView("reviews")}/><Quick icon={Gift} label="Campaigns" onClick={()=>setView("campaigns")}/></div></div></Panel></section>
+  <section className="grid gap-5 xl:grid-cols-2"><Panel title="New members" subtitle="Latest registrations"><MemberList members={stats?.recentUsers||[]}/></Panel><Panel title="Admin activity" subtitle="Latest actions"><AuditList items={stats?.audit||[]}/></Panel></section>
+</div>}
+
+function Reviews({items,bingxItems,cpx,withdrawals,totp,setTotp,patch}:{items:Submission[];bingxItems:BingXSubmission[];cpx:Tx[];withdrawals:Tx[];totp:string;setTotp:(v:string)=>void;patch:(url:string,id:string,status:"approved"|"rejected",extra?:object)=>void}){return <div className="space-y-6">
+  <section className="grid grid-cols-2 gap-3 lg:grid-cols-4"><MiniStat label="Task proofs" value={items.length}/><MiniStat label="BingX reviews" value={bingxItems.length}/><MiniStat label="CPX reconciliation" value={cpx.length}/><MiniStat label="Payout requests" value={withdrawals.length}/></section>
+  <Panel title="Review queue" subtitle="Check details before approval"><Queue title="Internal tasks" empty="No task proofs waiting.">{items.map(x=><QueueRow key={x._id} title={x.minijobId?.title||"Internal tasks"} user={x.userId?.email||x.userId?.name||"Members"} detail={`Reward ${x.minijobId?.reward||0} PHT`} proof={x.proofUrl} approve={()=>patch("/api/admin/submissions",x._id,"approved")} reject={()=>patch("/api/admin/submissions",x._id,"rejected")}/>)}</Queue>
+    <Queue title="BingX reviews" empty="No BingX reviews waiting.">{bingxItems.map(x=><QueueRow key={x._id} title={`BingX · Tier ${x.tier}`} user={x.userId?.email||x.userId?.name||"Members"} detail={`UID ${x.bingxUid} · ${x.rewardPht} PHT · · hold ${x.holdDays} days`} proof={x.proofImageUrl} approve={()=>patch("/api/admin/bingx",x._id,"approved")} reject={()=>patch("/api/admin/bingx",x._id,"rejected")}/>)}</Queue>
+    <Queue title="CPX survey reconciliation" empty="No CPX rewards waiting.">{cpx.map(x=><QueueRow key={x._id} title={`Survey #${x.metadata?.transId||x._id.slice(-6)}`} user={x.userId?.email||x.userId?.name||"Member"} detail={`${x.amount.toLocaleString()} PHT · $${Number(x.metadata?.amountUsd||0).toFixed(2)}`} approve={()=>patch("/api/admin/transactions",x._id,"approved",{totp})} reject={()=>patch("/api/admin/transactions",x._id,"rejected",{totp})}/>)}</Queue></Panel>
+  <Panel title="Member payouts" subtitle="Large payouts require a 6-digit code" action={<Link href="/admin/withdrawals" className="text-xs font-bold text-violet-300">Open payouts <ChevronRight className="inline" size={13}/></Link>}><input value={totp} onChange={e=>setTotp(e.target.value.replace(/\D/g,"").slice(0,6))} inputMode="numeric" className="field mt-4 max-w-64" placeholder="6-digit security code"/><div className="mt-4 space-y-2">{withdrawals.length?withdrawals.map(x=><QueueRow key={x._id} title={`${Math.abs(x.amount).toLocaleString()} ${x.currency||"PHT"}`} user={x.userId?.email||x.userId?.name||"Members"} detail={`${x.metadata?.bankName||"Payout method"} · ${x.metadata?.accountName||""}`} approve={()=>patch("/api/admin/transactions",x._id,"approved",{totp})} reject={()=>patch("/api/admin/transactions",x._id,"rejected",{totp})}/>):<Empty text="No pending payouts."/>}</div></Panel>
+</div>}
+
+function Campaigns({bingx,setBingx,save}:{bingx:BingXConfig;setBingx:(v:BingXConfig)=>void;save:()=>void}){return <div className="space-y-6"><section className="grid gap-3 md:grid-cols-3"><CampaignStatus name="BingX" status={bingx.active?"Live":"Disabled"} color="cyan"/><CampaignStatus name="OKX" status="Live" color="slate"/><CampaignStatus name="ARO Network" status="Live" color="emerald"/></section><Panel title="BingX campaign" subtitle="Manage link, benefits and reward tiers"><div className="mt-5 grid gap-3 md:grid-cols-2"><Field label="Referral code"><input className="field" value={bingx.affiliateId||""} onChange={e=>setBingx({...bingx,affiliateId:e.target.value})}/></Field><Field label="Signup link"><input className="field" value={bingx.affiliateUrl||""} onChange={e=>setBingx({...bingx,affiliateUrl:e.target.value})}/></Field><Field label="BingX benefits" wide><input className="field" value={bingx.mysteryBox||""} onChange={e=>setBingx({...bingx,mysteryBox:e.target.value})}/></Field></div><div className="mt-4 grid gap-3 xl:grid-cols-3">{([1,2,3] as const).map(t=>{const key=String(t) as "1"|"2"|"3",x=bingx.tiers[key];return <div key={key} className="rounded-2xl border border-white/10 bg-white/[.025] p-4"><div className="flex items-center justify-between"><b>Tier {t}</b><Switch checked={x.active} onChange={active=>setBingx({...bingx,tiers:{...bingx.tiers,[key]:{...x,active}}})}/></div><label className="mt-4 block text-[10px] text-slate-500">PHT REWARD</label><input type="number" className="field mt-1" value={x.rewardPht} onChange={e=>setBingx({...bingx,tiers:{...bingx.tiers,[key]:{...x,rewardPht:Number(e.target.value)}}})}/><label className="mt-3 block text-[10px] text-slate-500">HOLD (DAYS)</label><input type="number" className="field mt-1" value={x.holdDays} onChange={e=>setBingx({...bingx,tiers:{...bingx.tiers,[key]:{...x,holdDays:Number(e.target.value)}}})}/><textarea rows={3} className="field mt-3 resize-none" value={x.requirement} onChange={e=>setBingx({...bingx,tiers:{...bingx.tiers,[key]:{...x,requirement:e.target.value}}})}/></div>})}</div><div className="mt-5 flex flex-wrap items-center justify-between gap-3"><label className="flex items-center gap-3 text-sm"><Switch checked={bingx.active} onChange={active=>setBingx({...bingx,active})}/> Show campaign to members</label><button onClick={save} className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-cyan-300 to-blue-400 px-5 py-3 text-sm font-black text-[#101a2d]"><Save size={16}/> Save changes</button></div></Panel></div>}
+
+function Members({stats,members,query,setQuery,edit,remove}:{stats:Stats|null;members:Member[];query:string;setQuery:(v:string)=>void;edit:(m:Member)=>void;remove:(m:Member)=>void}){return <div className="space-y-6"><section className="grid grid-cols-2 gap-3 lg:grid-cols-4"><MiniStat label="Total members" value={stats?.users||0}/><MiniStat label="Active today" value={stats?.activeUsers||0}/><MiniStat label="Available PHT" value={compact(stats?.balances.availablePht)}/><MiniStat label="Pending PHT" value={compact(stats?.balances.pendingPht)}/></section><Panel title="Members" subtitle="Search and manage accounts" action={<div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3"><Search size={14}/><input className="w-40 bg-transparent py-2 text-xs outline-none" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search members"/></div>}><div className="mt-4 divide-y divide-white/5">{members.map(member=><div key={member._id} className="flex items-center gap-3 py-3"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500 text-xs font-black">{(member.name||member.email||"M")[0].toUpperCase()}</span><div className="min-w-0 flex-1"><div className="flex items-center gap-2"><b className="truncate text-sm">{member.name||"Member"}</b>{member.role==="admin"&&<span className="rounded bg-violet-400/15 px-1.5 py-0.5 text-[8px] text-violet-300">ADMIN</span>}{member.accountStatus==="suspended"&&<span className="rounded bg-red-400/15 px-1.5 py-0.5 text-[8px] text-red-300">SUSPENDED</span>}</div><p className="truncate text-[10px] text-slate-500">{member.email} · {member.country||"Unknown"}</p></div><div className="hidden text-right sm:block"><b className="text-xs text-amber-300">{fmt(member.phtBalance)} PHT</b><p className="text-[9px] text-slate-500">{fmt(member.pendingPht)} pending</p></div><IconButton title="Edit member" onClick={()=>edit(member)}><Pencil size={15}/></IconButton>{member.role!=="admin"&&<IconButton title="Delete member" onClick={()=>remove(member)} danger><Trash2 size={15}/></IconButton>}</div>)}{!members.length&&<Empty text="No members found."/>}</div></Panel></div>}
+
+function MemberEditor({member,setMember,close,save}:{member:Member;setMember:(m:Member)=>void;close:()=>void;save:(m:Member)=>void}){return <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4 backdrop-blur-sm" onMouseDown={e=>{if(e.currentTarget===e.target)close()}}><section className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-white/15 bg-[#211737] p-5 shadow-2xl"><div className="flex items-center justify-between"><div><h2 className="font-bold">Edit member</h2><p className="text-xs text-slate-500">{member.email}</p></div><IconButton title="Close" onClick={close}><X size={16}/></IconButton></div><div className="mt-5 grid gap-3 sm:grid-cols-2"><Field label="Display name" wide><input className="field" value={member.name||""} onChange={e=>setMember({...member,name:e.target.value})}/></Field><Field label="Member level"><select className="field" value={member.memberLevel||"starter"} onChange={e=>setMember({...member,memberLevel:e.target.value})}><option value="starter">Starter</option><option value="active">Active</option><option value="pro">Pro</option></select></Field><Field label="Account status"><select disabled={member.role==="admin"} className="field" value={member.accountStatus||"active"} onChange={e=>setMember({...member,accountStatus:e.target.value})}><option value="active">Active</option><option value="suspended">Suspended</option></select></Field><Field label="Available PHT"><input type="number" min="0" className="field" value={member.phtBalance||0} onChange={e=>setMember({...member,phtBalance:Number(e.target.value)})}/></Field><Field label="Pending PHT"><input type="number" min="0" className="field" value={member.pendingPht||0} onChange={e=>setMember({...member,pendingPht:Number(e.target.value)})}/></Field><Field label="USD balance"><input type="number" min="0" step="0.01" className="field" value={member.usdBalance||0} onChange={e=>setMember({...member,usdBalance:Number(e.target.value)})}/></Field><Field label="PE points"><input type="number" min="0" step="0.01" className="field" value={member.peBalance||0} onChange={e=>setMember({...member,peBalance:Number(e.target.value)})}/></Field></div><div className="mt-5 flex justify-end gap-2"><button onClick={close} className="rounded-xl border border-white/10 px-4 py-3 text-sm text-slate-300">Cancel</button><button onClick={()=>save(member)} className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-violet-500 to-fuchsia-500 px-5 py-3 text-sm font-bold"><Save size={15}/> Save member</button></div></section></div>}
+
+function Support({ready,text,setText,target,setTarget,sending,publish}:{ready:boolean;text:string;setText:(v:string)=>void;target:string;setTarget:(v:string)=>void;sending:boolean;publish:()=>void}){return <div className="grid gap-6 xl:grid-cols-[1.4fr_1fr]"><Panel title="Send community update" subtitle="Write once and choose a channel"><div className="mt-4 flex gap-2">{[["news","News"],["community","Community"],["both","Both"]].map(([k,l])=><button key={k} onClick={()=>setTarget(k)} className={`rounded-xl px-3 py-2 text-xs ${target===k?"bg-violet-500":"bg-white/5 text-slate-400"}`}>{l}</button>)}</div><textarea rows={9} maxLength={4096} className="field mt-3 resize-none" value={text} onChange={e=>setText(e.target.value)} placeholder="Write a message for members..."/><div className="mt-3 flex items-center justify-between"><span className={`text-xs ${ready?"text-emerald-300":"text-amber-300"}`}>{ready?"● Channel ready":"● Channel not connected"}</span><button disabled={sending||!text.trim()} onClick={publish} className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-violet-500 to-fuchsia-500 px-5 py-3 text-sm font-bold disabled:opacity-40"><Send size={15}/>{sending?"Sending...":"Send"}</button></div></Panel><div className="space-y-4"><Panel title="Support center" subtitle="Member support channels"><div className="mt-4 space-y-2"><SupportLink icon={Headphones} label="Support email" note="Account and task issues" href="mailto:support@blissbiovn.com"/><SupportLink icon={Users} label="Telegram community" note="Review member feedback" href="https://t.me/pureearngroup"/><SupportLink icon={Megaphone} label="News channel" note="Review published updates" href="https://t.me/pureearnglobal"/></div></Panel><Panel title="Daily checklist" subtitle="Today's priorities"><ul className="mt-4 space-y-3 text-sm text-slate-300"><li>• Review pending payouts and proofs.</li><li>• Release CPX rewards only after partner payment.</li><li>• Notify members when campaign terms change.</li></ul></Panel></div></div>}
+
+function Security({stats}:{stats:Stats|null}){return <div className="grid gap-6 xl:grid-cols-2"><Panel title="Security status" subtitle="Admin protection"><div className="mt-5 space-y-2"><SecurityRow title="Separate admin login" note="Admin role required" good/><SecurityRow title="Auto sign-out" note="Session ends after 15 minutes" good/><SecurityRow title="Large payout confirmation" note="6-digit code required" good/><SecurityRow title="Protected audit log" note={`${stats?.audit?.length||0} recent actions recorded`} good/><SecurityRow title="Login alerts" note="Connect Telegram or email alerts"/></div></Panel><Panel title="Admin log" subtitle="Who did what and when"><AuditList items={stats?.audit||[]}/></Panel></div>}
+
+function Profile(){const [profile,setProfile]=useState({name:"Administrator",email:"",username:"admin"}),[current,setCurrent]=useState(""),[next,setNext]=useState(""),[confirmPassword,setConfirmPassword]=useState(""),[message,setMessage]=useState(""),[busy,setBusy]=useState(false);useEffect(()=>{fetch("/api/admin/profile").then(r=>r.json()).then(setProfile).catch(()=>{})},[]);async function changePassword(e:React.FormEvent){e.preventDefault();if(next!==confirmPassword)return setMessage("New passwords do not match.");setBusy(true);const r=await fetch("/api/admin/profile",{method:"PATCH",headers:{"content-type":"application/json"},body:JSON.stringify({currentPassword:current,newPassword:next})});const d=await r.json();setMessage(r.ok?"Password changed. Use the new password next time.":d.error||"Could not change password.");if(r.ok){setCurrent("");setNext("");setConfirmPassword("")}setBusy(false)}return <div className="grid gap-6 xl:grid-cols-[.8fr_1.2fr]"><Panel title="Admin account" subtitle="Your administrator profile"><div className="mt-5 flex items-center gap-4"><span className="grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-violet-500 to-fuchsia-500 text-xl font-black">{(profile.name||"A")[0]}</span><div><b>{profile.name}</b><p className="text-xs text-slate-400">@{profile.username}</p><p className="text-xs text-slate-500">{profile.email}</p></div></div><button onClick={()=>signOut({callbackUrl:"/admin-login"})} className="mt-6 flex items-center gap-2 rounded-xl border border-white/10 px-4 py-3 text-sm text-slate-300"><LogOut size={15}/> Sign out</button></Panel><Panel title="Change password" subtitle="Use a strong password only you know"><form onSubmit={changePassword} className="mt-5 space-y-3"><input required type="password" className="field" value={current} onChange={e=>setCurrent(e.target.value)} placeholder="Current password" autoComplete="current-password"/><input required type="password" className="field" value={next} onChange={e=>setNext(e.target.value)} placeholder="New password" autoComplete="new-password"/><input required type="password" className="field" value={confirmPassword} onChange={e=>setConfirmPassword(e.target.value)} placeholder="Confirm new password" autoComplete="new-password"/><p className="text-[10px] leading-4 text-slate-500">At least 12 characters with upper/lowercase letters, a number and a symbol.</p>{message&&<p className="rounded-xl bg-white/5 p-3 text-xs text-violet-200">{message}</p>}<button disabled={busy} className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-violet-500 to-fuchsia-500 px-5 py-3 text-sm font-bold disabled:opacity-50"><Save size={15}/>{busy?"Saving...":"Change password"}</button></form></Panel></div>}
+
+function RewardChart({days}:{days:Day[]}){const max=Math.max(1,...days.flatMap(x=>[x.approved,x.pending]));return <div className="mt-6"><div className="flex h-56 items-end gap-2 sm:gap-4">{days.map(x=><div key={x.date} className="flex h-full flex-1 flex-col justify-end"><div className="flex flex-1 items-end justify-center gap-1"><div title={`${x.approved} PHT approved`} className="w-[38%] rounded-t-md bg-gradient-to-t from-violet-600 to-fuchsia-400" style={{height:`${Math.max(3,x.approved/max*100)}%`}}/><div title={`${x.pending} Pending PHT`} className="w-[38%] rounded-t-md bg-gradient-to-t from-amber-500 to-yellow-300" style={{height:`${Math.max(3,x.pending/max*100)}%`}}/></div><span className="mt-2 text-center text-[9px] text-slate-500">{new Date(x.date).toLocaleDateString("vi-VN",{weekday:"short"})}</span></div>)}</div><div className="mt-4 flex gap-4 text-[10px] text-slate-400"><span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-fuchsia-400"/>Approved</span><span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-amber-300"/>Pending</span></div></div>}
+function Panel({title,subtitle,action,children}:{title:string;subtitle?:string;action?:React.ReactNode;children:React.ReactNode}){return <section className="rounded-2xl border border-white/10 bg-[#1b1430] p-4 shadow-xl shadow-black/10 md:p-5"><div className="flex items-start justify-between gap-3"><div><h2 className="font-bold">{title}</h2>{subtitle&&<p className="mt-1 text-xs text-slate-500">{subtitle}</p>}</div>{action}</div>{children}</section>}
+function Metric({icon:Icon,label,value,note,color}:{icon:React.ElementType;label:string;value:string;note:string;color:string}){const c:{[k:string]:string}={violet:"from-violet-500/25 text-violet-300",amber:"from-amber-400/20 text-amber-300",cyan:"from-cyan-400/20 text-cyan-300",emerald:"from-emerald-400/20 text-emerald-300"};return <div className={`rounded-2xl border border-white/10 bg-gradient-to-br ${c[color]} to-[#1b1430] p-4`}><div className="flex items-start justify-between"><span className="grid h-9 w-9 place-items-center rounded-xl bg-white/10"><Icon size={18}/></span><TrendingUp size={14} className="opacity-50"/></div><p className="mt-4 text-[10px] uppercase tracking-wider text-slate-400">{label}</p><b className="mt-1 block text-xl text-white">{value}</b><small className="text-[10px] text-slate-500">{note}</small></div>}
+function Queue({title,empty,children}:{title:string;empty:string;children:React.ReactNode}){const has=Array.isArray(children)?children.length>0:Boolean(children);return <div className="mt-5"><h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">{title}</h3><div className="mt-2 space-y-2">{has?children:<Empty text={empty}/>}</div></div>}
+function QueueRow({title,user,detail,proof,approve,reject}:{title:string;user:string;detail:string;proof?:string;approve:()=>void;reject:()=>void}){return <article className="flex flex-col gap-3 rounded-xl border border-white/10 bg-white/[.025] p-3 md:flex-row md:items-center"><div className="min-w-0 flex-1"><b className="block truncate text-sm">{title}</b><p className="mt-1 truncate text-xs text-slate-400">{user} · {detail}</p></div>{proof&&<a href={proof} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-xs font-bold text-cyan-300">View proof <ExternalLink size={12}/></a>}<div className="flex gap-2"><IconButton title="Reject" onClick={reject} danger><X size={16}/></IconButton><IconButton title="Approve" onClick={approve} success><Check size={16}/></IconButton></div></article>}
+function MemberList({members}:{members:Member[]}){return <div className="mt-4 divide-y divide-white/5">{members.length?members.map(x=><div key={x._id} className="flex items-center gap-3 py-3"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500 text-xs font-black">{(x.name||x.email||"M")[0].toUpperCase()}</span><div className="min-w-0 flex-1"><b className="block truncate text-sm">{x.name||"Members"}</b><p className="truncate text-[10px] text-slate-500">{x.email} · {x.country||"Unknown country"}</p></div><div className="text-right"><b className="text-xs text-amber-300">{fmt(x.totalEarnedPht)} PHT</b><p className="text-[9px] text-slate-500">{new Date(x.createdAt).toLocaleDateString("vi-VN")}</p></div></div>):<Empty text="No member data."/>}</div>}
+function AuditList({items}:{items:Audit[]}){const labels=(s:string)=>s.replace("admin.withdrawal.approved","Payout approved").replace("admin.withdrawal.rejected","Payout rejected").replace("admin.transaction.approved","Transaction approved").replace("admin.transaction.rejected","Transaction rejected").replace("admin.password.changed","Password changed");return <div className="mt-4 space-y-3">{items.length?items.map(x=><div key={x._id} className="flex gap-3"><span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-violet-400 shadow shadow-violet-400"/><div className="min-w-0 flex-1"><b className="block truncate text-xs">{labels(x.action)}</b><p className="truncate text-[10px] text-slate-500">{x.actorId?.name||x.actorId?.email||"Administrator"} · {new Date(x.createdAt).toLocaleString("en-US")}</p></div></div>):<Empty text="No admin activity."/>}</div>}
+function Progress({label,value,total,color}:{label:string;value:number;total:number;color:string}){const pct=Math.min(100,value/Math.max(1,total)*100);return <div><div className="flex justify-between text-xs"><span className="text-slate-400">{label}</span><b>{compact(value)} PHT</b></div><div className="mt-2 h-2 overflow-hidden rounded-full bg-white/5"><div className={`h-full rounded-full ${color}`} style={{width:`${Math.max(2,pct)}%`}}/></div></div>}
+function Quick({icon:Icon,label,onClick}:{icon:React.ElementType;label:string;onClick:()=>void}){return <button onClick={onClick} className="flex items-center gap-2 rounded-xl bg-white/5 p-3 text-left text-xs hover:bg-white/10"><Icon size={15} className="text-violet-300"/>{label}<ChevronRight size={12} className="ml-auto"/></button>}
+function MiniStat({label,value}:{label:string;value:string|number}){return <div className="rounded-2xl border border-white/10 bg-[#1b1430] p-4"><b className="text-xl">{value}</b><p className="mt-1 text-[10px] text-slate-500">{label}</p></div>}
+function CampaignStatus({name,status,color}:{name:string;status:string;color:string}){const c:{[k:string]:string}={cyan:"from-cyan-400/20 text-cyan-300",slate:"from-slate-300/15 text-slate-200",emerald:"from-emerald-400/20 text-emerald-300"};return <div className={`rounded-2xl border border-white/10 bg-gradient-to-br ${c[color]} to-[#1b1430] p-4`}><Gift size={18}/><b className="mt-4 block text-white">{name}</b><span className="text-[10px]">● {status}</span></div>}
+function Field({label,wide,children}:{label:string;wide?:boolean;children:React.ReactNode}){return <label className={wide?"md:col-span-2":""}><span className="mb-1.5 block text-[10px] text-slate-500">{label}</span>{children}</label>}
+function Switch({checked,onChange}:{checked:boolean;onChange:(v:boolean)=>void}){return <button type="button" onClick={()=>onChange(!checked)} className={`relative h-6 w-11 rounded-full transition ${checked?"bg-emerald-400":"bg-white/10"}`}><span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition ${checked?"left-6":"left-1"}`}/></button>}
+function SupportLink({icon:Icon,label,note,href}:{icon:React.ElementType;label:string;note:string;href:string}){return <a href={href} target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[.025] p-3 hover:bg-white/5"><span className="grid h-9 w-9 place-items-center rounded-xl bg-violet-500/15 text-violet-300"><Icon size={16}/></span><span className="min-w-0 flex-1"><b className="block text-xs">{label}</b><small className="text-[10px] text-slate-500">{note}</small></span><ExternalLink size={13}/></a>}
+function SecurityRow({title,note,good=false}:{title:string;note:string;good?:boolean}){return <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[.025] p-3"><span className={`grid h-8 w-8 place-items-center rounded-full ${good?"bg-emerald-400/15 text-emerald-300":"bg-amber-300/15 text-amber-300"}`}>{good?<Check size={15}/>:<Clock3 size={15}/>}</span><div><b className="text-xs">{title}</b><p className="text-[10px] text-slate-500">{note}</p></div></div>}
+function IconButton({title,onClick,children,danger,success}:{title:string;onClick?:()=>void;children:React.ReactNode;danger?:boolean;success?:boolean}){return <button title={title} aria-label={title} onClick={onClick} className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl border transition ${danger?"border-red-400/20 bg-red-400/10 text-red-300":success?"border-emerald-400/20 bg-emerald-400 text-[#10251e]":"border-white/10 bg-white/5 text-slate-300 hover:text-white"}`}>{children}</button>}
+function Empty({text}:{text:string}){return <div className="rounded-xl border border-dashed border-white/10 p-6 text-center text-xs text-slate-500">{text}</div>}
+const fmt=(n?:number)=>Number(n||0).toLocaleString("vi-VN"); const compact=(n?:number)=>Intl.NumberFormat("vi-VN",{notation:"compact",maximumFractionDigits:1}).format(Number(n||0));

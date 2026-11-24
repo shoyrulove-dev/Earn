@@ -5,6 +5,7 @@ import { approveReferralForEarning } from "@/lib/referrals";
 import Transaction from "@/models/Transaction";
 import User from "@/models/User";
 import { syncAccessTradeTransactions } from "@/lib/accesstrade-sync";
+import { awardPeForApprovedEarning } from "@/lib/pe";
 
 export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
@@ -25,6 +26,7 @@ export async function GET(request: Request) {
     currency: "PHT",
     status: "pending",
     availableAt: { $lte: new Date() },
+    source: { $ne: "cpx" },
     $or: [{ source: { $ne: "accesstrade" } }, { "metadata.networkStatus": 1 }],
   })
     .select("_id")
@@ -60,6 +62,7 @@ export async function GET(request: Request) {
         },
       });
     await approveReferralForEarning(tx);
+    await awardPeForApprovedEarning(tx._id);
     settled++;
   }
   return NextResponse.json({ ok: true, accessTrade, settled });

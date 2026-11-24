@@ -6,6 +6,7 @@ import Image from "next/image";
 import { countryOptions, normalizeCountry } from "@/lib/countries";
 import Turnstile from "@/components/Turnstile";
 import {
+  Apple,
   ArrowDownToLine,
   ArrowUpRight,
   BadgeCheck,
@@ -29,6 +30,8 @@ import {
   Save,
   Search,
   ShieldCheck,
+  Smartphone,
+  Sparkles,
   Trophy,
   UserRound,
   Users,
@@ -59,9 +62,12 @@ type User = {
   usdBalance?: number;
   pendingPht?: number;
   totalEarnedPht?: number;
+  peBalance?: number;
+  totalEarnedPe?: number;
   vipLevel?: "bronze" | "silver" | "gold" | "diamond";
   checkinStreak?: number;
   lastCheckinAt?: string;
+  lastCheckinDate?: string;
   role?: string;
   referralCode?: string;
   referralEarnings?: number;
@@ -77,9 +83,11 @@ type Job = {
   tags?: string[];
   icon?: string;
   externalUrl?: string;
+  countryCode?: string;
 };
 type Campaign = {
   campaign_id: string;
+  network?: string;
   name: string;
   logo?: string;
   max_commission?: number;
@@ -90,19 +98,38 @@ type Campaign = {
   description?: string;
   campaign_type?: string;
   estimated_reward_pht?: number;
+  min_reward_pht?: number;
+  max_reward_pht?: number;
+  exact_reward?: boolean;
+  variable_reward?: boolean;
+  max_commission_rate?: number;
+  custom_instructions?: boolean;
+  member_reward_note?: string;
   hold_days?: number;
   reward_note?: string;
   instructions?: string[];
 };
+type CpxSurvey = {
+  id?: string | number;
+  loi?: number | string;
+  payout?: number | string;
+  quality_score?: number | string;
+  score?: number | string;
+  statistics_rating_avg?: number | string;
+  statistics_rating_count?: number | string;
+  top?: boolean | number | string;
+  href?: string;
+  href_new?: string;
+};
 type Tx = {
   _id: string;
   type: string;
-  currency?: "PHT" | "USD";
+  currency?: "PHT" | "USD" | "PE";
   amount: number;
   status: string;
   source?: string;
   createdAt: string;
-  metadata?: { feePht?: number; netPht?: number };
+  metadata?: { feePht?: number; netPht?: number; peReward?: number; checkinDate?: string };
 };
 type Referral = {
   _id: string;
@@ -118,6 +145,25 @@ type Leader = {
   pht: number;
 };
 
+// Local partner programs are kept here when a partner issues a per-member
+// referral code instead of a trackable network callback. Country targeting is
+// enforced in the member UI; the program itself also states the restriction.
+const LOCAL_PARTNER_JOBS: Job[] = [
+  {
+    _id: "tikluy-vn-ekyc",
+    title: "Tikluy · Đăng ký & eKYC",
+    description:
+      "Dành riêng cho Việt Nam. Tải app, nhập mã 0559287728 và hoàn tất eKYC bằng thông tin chính chủ.",
+    reward: 600,
+    rewardCurrency: "PHT",
+    source: "Tikluy",
+    tags: ["Vietnam", "eKYC", "Cashback"],
+    icon: "T",
+    countryCode: "VN",
+    externalUrl: "https://play.google.com/store/apps/details?id=com.tikluy",
+  },
+];
+
 const offerDetailCopy = {
   en: {
     estimated: "Estimated reward",
@@ -125,16 +171,16 @@ const offerDetailCopy = {
     pending: "Pending period",
     days: "days",
     rewardNote:
-      "The reward is calculated after AccessTrade confirms a valid conversion.",
+      "The reward is credited after our advertising partner confirms a valid conversion.",
     howTo: "How to complete",
     steps: (name: string, days: number) => [
       `Open ${name} from Pure Earn and continue on the same browser and device.`,
       "Read and complete every condition shown by the partner using accurate personal information.",
       "Only new eligible customers qualify. Do not use a VPN, emulator, duplicate account or false identity.",
-      `After AccessTrade confirms the conversion, the reward remains pending for about ${days} days for reconciliation.`,
+      `After our advertising partner confirms the conversion, the reward remains pending for about ${days} days for reconciliation.`,
     ],
     warning:
-      "New eligible users only. VPNs, emulators, duplicate accounts and false information are prohibited. The final reward depends on AccessTrade validation.",
+      "New eligible users only. VPNs, emulators, duplicate accounts and false information are prohibited. The final reward depends on partner validation.",
     start: "I understand · Start offer",
   },
   vi: {
@@ -143,16 +189,16 @@ const offerDetailCopy = {
     pending: "Thời gian chờ",
     days: "ngày",
     rewardNote:
-      "Phần thưởng được tính sau khi AccessTrade xác nhận chuyển đổi hợp lệ.",
+      "Phần thưởng được cộng sau khi đối tác quảng cáo xác nhận chuyển đổi hợp lệ.",
     howTo: "Cách hoàn thành",
     steps: (name: string, days: number) => [
       `Mở ${name} từ Pure Earn và tiếp tục trên cùng trình duyệt, thiết bị.`,
       "Đọc kỹ và hoàn thành mọi điều kiện do đối tác hiển thị bằng thông tin cá nhân chính xác.",
       "Chỉ khách hàng mới đủ điều kiện. Không dùng VPN, máy ảo, tài khoản trùng lặp hoặc thông tin giả.",
-      `Sau khi AccessTrade xác nhận chuyển đổi, phần thưởng sẽ chờ khoảng ${days} ngày để đối soát.`,
+      `Sau khi đối tác quảng cáo xác nhận chuyển đổi, phần thưởng sẽ chờ khoảng ${days} ngày để đối soát.`,
     ],
     warning:
-      "Chỉ người dùng mới đủ điều kiện. Cấm VPN, máy ảo, tài khoản trùng lặp và thông tin giả. Phần thưởng cuối cùng phụ thuộc dữ liệu đối soát AccessTrade.",
+      "Chỉ người dùng mới đủ điều kiện. Cấm VPN, máy ảo, tài khoản trùng lặp và thông tin giả. Phần thưởng cuối cùng phụ thuộc dữ liệu đối soát của đối tác.",
     start: "Tôi đã hiểu · Bắt đầu làm",
   },
   zh: {
@@ -160,16 +206,16 @@ const offerDetailCopy = {
     validation: "审核后确定",
     pending: "待审核时间",
     days: "天",
-    rewardNote: "AccessTrade 确认转化有效后，系统才会计算奖励。",
+    rewardNote: "广告合作伙伴确认转化有效后，系统才会发放奖励。",
     howTo: "完成方式",
     steps: (name: string, days: number) => [
       `从 Pure Earn 打开 ${name}，并始终使用同一浏览器和设备。`,
       "仔细阅读并使用真实、准确的个人信息完成合作方显示的所有条件。",
       "仅限符合条件的新用户。禁止使用 VPN、模拟器、重复账户或虚假身份。",
-      `AccessTrade 确认转化后，奖励将等待约 ${days} 天进行核对。`,
+      `广告合作伙伴确认转化后，奖励将等待约 ${days} 天进行核对。`,
     ],
     warning:
-      "仅限符合条件的新用户。禁止 VPN、模拟器、重复账户和虚假信息。最终奖励以 AccessTrade 审核结果为准。",
+      "仅限符合条件的新用户。禁止 VPN、模拟器、重复账户和虚假信息。最终奖励以合作伙伴审核结果为准。",
     start: "我已了解 · 开始任务",
   },
   es: {
@@ -178,25 +224,25 @@ const offerDetailCopy = {
     pending: "Periodo pendiente",
     days: "días",
     rewardNote:
-      "La recompensa se calcula cuando AccessTrade confirma una conversión válida.",
+      "La recompensa se acredita cuando nuestro socio publicitario confirma una conversión válida.",
     howTo: "Cómo completar",
     steps: (name: string, days: number) => [
       `Abre ${name} desde Pure Earn y continúa en el mismo navegador y dispositivo.`,
       "Lee y completa todas las condiciones del socio con información personal correcta.",
       "Solo califican clientes nuevos elegibles. No uses VPN, emuladores, cuentas duplicadas ni identidades falsas.",
-      `Cuando AccessTrade confirme la conversión, la recompensa quedará pendiente unos ${days} días para su conciliación.`,
+      `Cuando el socio publicitario confirme la conversión, la recompensa quedará pendiente unos ${days} días para su conciliación.`,
     ],
     warning:
-      "Solo para nuevos usuarios elegibles. Se prohíben VPN, emuladores, cuentas duplicadas e información falsa. La recompensa final depende de la validación de AccessTrade.",
+      "Solo para nuevos usuarios elegibles. Se prohíben VPN, emuladores, cuentas duplicadas e información falsa. La recompensa final depende de la validación del socio.",
     start: "Entendido · Iniciar oferta",
   },
 };
 
 const accessTradeRegionCopy: Record<Locale, string> = {
-  en: "AccessTrade CPA offers are available only to users in Vietnam.",
-  vi: "Các ưu đãi CPA từ AccessTrade chỉ dành cho người dùng tại Việt Nam.",
-  zh: "AccessTrade CPA 任务仅面向越南用户开放。",
-  es: "Las ofertas CPA de AccessTrade solo están disponibles para usuarios de Vietnam.",
+  en: "These partner offers are available only to users in Vietnam.",
+  vi: "Các ưu đãi đối tác này chỉ dành cho người dùng tại Việt Nam.",
+  zh: "这些合作任务仅面向越南用户开放。",
+  es: "Estas ofertas de socios solo están disponibles para usuarios de Vietnam.",
 };
 
 const payoutCopy = {
@@ -543,7 +589,7 @@ const copy = {
     search: "Search offers",
     partner: "Partner offers",
     cashout: "Cash out",
-    amount: "Amount (PHT)",
+    amount: "Withdrawal amount (USD)",
     request: "Request withdrawal",
     min: "Minimum $5 USD. Swap PHT to USD before withdrawal. Fees depend on your tier.",
     recent: "Recent transactions",
@@ -583,7 +629,7 @@ const copy = {
     search: "Tìm nhiệm vụ",
     partner: "Nhiệm vụ đối tác",
     cashout: "Rút thưởng",
-    amount: "Số PHT",
+    amount: "Số tiền rút (USD)",
     request: "Gửi yêu cầu rút",
     min: "Tối thiểu 5 USD. Hãy đổi PHT sang USD trước khi rút. Phí tùy cấp thành viên.",
     recent: "Giao dịch gần đây",
@@ -623,7 +669,7 @@ const copy = {
     search: "搜索任务",
     partner: "合作任务",
     cashout: "兑换奖励",
-    amount: "PHT 数量",
+    amount: "提现金额 (USD)",
     request: "提交提现",
     min: "最低提现 5 USD。请先将 PHT 兑换为 USD。",
     recent: "最近交易",
@@ -663,7 +709,7 @@ const copy = {
     search: "Buscar ofertas",
     partner: "Ofertas asociadas",
     cashout: "Retirar",
-    amount: "Cantidad (PHT)",
+    amount: "Importe del retiro (USD)",
     request: "Solicitar retiro",
     min: "Mínimo 5 USD. Convierte PHT a USD antes de retirar.",
     recent: "Transacciones recientes",
@@ -849,6 +895,8 @@ const pht = (n = 0) => (
     {Math.floor(n).toLocaleString()} PHT <PhtCoin />
   </span>
 );
+const pe = (n = 0) => `${Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })} PE`;
+const companionPe = (phtAmount = 0) => Math.floor(Math.max(0, phtAmount) / 10) / 100;
 function currentDevice() {
   if (typeof window === "undefined") return "";
   let id = localStorage.getItem("pureearn_device_id");
@@ -965,6 +1013,13 @@ export default function DashboardPage() {
   const locale = user?.locale || "en",
     t = { ...copy[locale], ...extraCopy[locale] } as Words;
   useEffect(() => {
+    if (document.cookie.split("; ").includes("pureearn_deep_link=tikluy")) {
+      setScreen("Offers");
+      document.cookie = "pureearn_deep_link=; Path=/; Max-Age=0; SameSite=Lax; Secure";
+    }
+    // Never leave the member on a blank loading shell if a cold API/database
+    // connection is slow. Account values replace the lightweight screen once ready.
+    const firstPaintTimer = window.setTimeout(() => setLoading(false), 1200);
     fetch("/api/device", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -975,35 +1030,88 @@ export default function DashboardPage() {
           setNotice((await r.json()).error || "Device verification failed");
       })
       .catch(() => {});
-    Promise.allSettled(
-      [
-        "/api/me",
-        "/api/minijobs",
-        "/api/transactions",
-        "/api/referrals",
-        "/api/pht/leaderboard",
-      ].map((x) => fetch(x)),
-    )
+    // User data is the only request needed for first paint. Everything else
+    // hydrates in the background so a slow leaderboard/referral query cannot
+    // hold the entire member dashboard on its skeleton.
+    fetch("/api/me", { cache: "no-store" })
       .then(async (r) => {
-        if (r[0].status === "fulfilled" && r[0].value.ok)
-          setUser((await r[0].value.json()).user);
+        if (!r.ok) throw new Error("Unable to load member account");
+        setUser((await r.json()).user);
+        window.setTimeout(() => {
+          fetch("/api/me?maintenance=1", { cache: "no-store" })
+            .then(async (maintenance) => {
+              if (maintenance.ok) setUser((await maintenance.json()).user);
+            })
+            .catch(() => {});
+        }, 1200);
+      })
+      .catch((error) => setNotice(error instanceof Error ? error.message : "Unable to load member account"))
+      .finally(() => setLoading(false));
+
+    Promise.allSettled([
+      fetch("/api/minijobs"),
+      fetch("/api/transactions"),
+      fetch("/api/referrals"),
+      fetch("/api/pht/leaderboard"),
+    ]).then(async (r) => {
+        if (r[0].status === "fulfilled" && r[0].value.ok) {
+          const loadedJobs = (await r[0].value.json()).jobs || [];
+          setJobs([
+            ...LOCAL_PARTNER_JOBS,
+            ...loadedJobs,
+            {
+              _id: "aro-network-level-i",
+              title: "ARO Network · Level I",
+              description: locale === "zh" ? "通过 Pure Earn 链接注册 ARO，加入社区、绑定账户并运行桌面或移动节点。审核完成后可获得 50 PHT。" : locale === "es" ? "Regístrate en ARO mediante Pure Earn, únete a la comunidad, vincula tu cuenta y ejecuta un nodo. Recibe 50 PHT tras la revisión." : locale === "en" ? "Sign up for ARO through Pure Earn, join the community, bind your account and run a desktop or mobile node. Receive 50 PHT after review." : "Đăng ký ARO qua Pure Earn, tham gia cộng đồng, liên kết tài khoản và chạy node. Nhận 50 PHT sau khi kiểm tra.",
+              reward: 50,
+              rewardCurrency: "PHT",
+              source: "ARO",
+              tags: ["Referral", "Node", "Level I"],
+              icon: "A",
+              externalUrl: "https://dashboard.aro.network/signup?referral=DH1S",
+            },
+            {
+              _id: "okx-kyc",
+              title: locale === "zh" ? "OKX · 注册并完成 KYC" : locale === "es" ? "OKX · Registro y KYC" : locale === "en" ? "OKX · Sign up & KYC" : "OKX · Đăng ký & KYC",
+              description: locale === "zh" ? "通过 Pure Earn 链接注册 OKX 并完成 KYC。审核完成后可获得 50 PHT。神秘盒子、充值和交易条件取决于 OKX 的活动和地区，请以应用内规则为准。" : locale === "es" ? "Regístrate en OKX mediante Pure Earn y completa el KYC. Recibe 50 PHT tras la revisión. Las condiciones de la caja misteriosa, depósito y trading dependen de la campaña y región de OKX." : locale === "en" ? "Sign up for OKX through Pure Earn and complete KYC. Receive 50 PHT after review. Mystery-box, deposit and trading conditions depend on the OKX campaign and region." : "Đăng ký OKX qua link Pure Earn và hoàn tất KYC. Nhận 50 PHT sau khi kiểm tra. Điều kiện hộp quà, nạp tiền và giao dịch phụ thuộc chương trình và khu vực OKX.",
+              reward: 50,
+              rewardCurrency: "PHT",
+              source: "OKX",
+              tags: ["Referral", "KYC"],
+              icon: "O",
+              externalUrl: "https://okx.com/join/IZDYWFST",
+            },
+            {
+              _id: "bingx-kyc",
+              title: locale === "zh" ? "BingX · 注册并完成 KYC" : locale === "es" ? "BingX · Registro y KYC" : locale === "en" ? "BingX · Sign up & KYC" : "BingX · Đăng ký & KYC",
+              description: locale === "zh" ? "通过 Pure Earn 链接注册 BingX 并完成 KYC。审核完成后可获得 50 PHT。新用户神秘盒子和交易条件以 BingX 当前活动规则为准。" : locale === "es" ? "Regístrate en BingX mediante Pure Earn y completa el KYC. Recibe 50 PHT tras la revisión. La caja misteriosa y las condiciones de trading dependen de la campaña vigente de BingX." : locale === "en" ? "Sign up for BingX through Pure Earn and complete KYC. Receive 50 PHT after review. The mystery box and trading conditions depend on the current BingX campaign." : "Đăng ký BingX qua link Pure Earn và hoàn tất KYC. Nhận 50 PHT sau khi kiểm tra. Hộp quà và điều kiện giao dịch phụ thuộc chương trình BingX hiện hành.",
+              reward: 50,
+              rewardCurrency: "PHT",
+              source: "BingX",
+              tags: ["Referral", "KYC"],
+              icon: "B",
+              externalUrl: "https://bingxdao.com/invite/1FNYBD/",
+            },
+          ]);
+        }
         if (r[1].status === "fulfilled" && r[1].value.ok)
-          setJobs((await r[1].value.json()).jobs || []);
-        if (r[2].status === "fulfilled" && r[2].value.ok)
-          setTxs((await r[2].value.json()).transactions || []);
-        if (r[3].status === "fulfilled" && r[3].value.ok) {
-          const x = await r[3].value.json();
+          setTxs((await r[1].value.json()).transactions || []);
+        if (r[2].status === "fulfilled" && r[2].value.ok) {
+          const x = await r[2].value.json();
           setMembers(x.members || 0);
           setReferrals(x.recent || []);
           setReferralPending(x.pendingReferralPht || 0);
           setReferralRate(x.terms?.rate || 0.05);
           setActivationBonus(x.terms?.activationBonus || 500);
         }
-        if (r[4].status === "fulfilled" && r[4].value.ok)
-          setLeaders((await r[4].value.json()).leaders || []);
-      })
-      .finally(() => setLoading(false));
-    loadOffers();
+        if (r[3].status === "fulfilled" && r[3].value.ok)
+          setLeaders((await r[3].value.json()).leaders || []);
+      });
+    const offerTimer = window.setTimeout(loadOffers, 300);
+    return () => {
+      window.clearTimeout(firstPaintTimer);
+      window.clearTimeout(offerTimer);
+    };
   }, []);
   async function loadOffers() {
     setOfferLoading(true);
@@ -1056,12 +1164,16 @@ export default function DashboardPage() {
     setScreen(s);
     setMenu(false);
   };
+  const visibleJobs = jobs.filter(
+    (job) => !job.countryCode || job.countryCode === user?.country,
+  );
   const body = loading ? (
     <Skeleton />
   ) : screen === "Home" ? (
     <HomeView
       user={user}
-      jobs={jobs}
+      onUser={setUser}
+      jobs={visibleJobs}
       campaigns={campaigns}
       members={members}
       t={t}
@@ -1069,7 +1181,8 @@ export default function DashboardPage() {
     />
   ) : screen === "Offers" ? (
     <OffersView
-      jobs={jobs}
+      jobs={visibleJobs}
+      referralCode={user?.referralCode}
       campaigns={campaigns}
       loading={offerLoading}
       t={t}
@@ -1337,6 +1450,7 @@ function SideMenu({
 
 function HomeView({
   user,
+  onUser,
   jobs,
   campaigns,
   members,
@@ -1344,6 +1458,7 @@ function HomeView({
   nav,
 }: {
   user: User | null;
+  onUser: (user: User | null) => void;
   jobs: Job[];
   campaigns: Campaign[];
   members: number;
@@ -1355,10 +1470,10 @@ function HomeView({
       <Balance user={user} t={t} withdraw={() => nav("Wallet")} />
       <div className="mt-3 grid grid-cols-3 gap-2">
         <Stat n={pht(user?.pendingPht)} l={t.pending} />
-        <Stat n={String(members)} l={t.referrals} />
+        <Stat n={pe(user?.peBalance)} l="Ecosystem" />
         <Stat n={tierLabel(user?.locale, user?.totalEarnedPht)} l={t.tier} />
       </div>
-      <Checkin user={user} t={t} />
+      <Checkin user={user} t={t} onUser={onUser} />
       <button
         onClick={() => nav("Referrals")}
         className="card mt-3 flex w-full items-center gap-3 text-left"
@@ -1380,7 +1495,7 @@ function HomeView({
       />
       <div className="space-y-2">
         {jobs.slice(0, 2).map((x) => (
-          <JobCard key={x._id} x={x} />
+          <JobCard key={x._id} x={x} locale={user?.locale || "en"} referralCode={user?.referralCode} />
         ))}
         {campaigns.slice(0, 3).map((x) => (
           <OfferCard
@@ -1428,17 +1543,54 @@ function Balance({
     </section>
   );
 }
-function Checkin({ user, t }: { user: User | null; t: Words }) {
+function Checkin({ user, t, onUser }: { user: User | null; t: Words; onUser: (user: User | null) => void }) {
   const [msg, setMsg] = useState("");
-  const today = new Date().toISOString().slice(0, 10),
+  const [claiming, setClaiming] = useState(false);
+  const dateKey = (date = new Date()) => {
+    const parts = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Ho_Chi_Minh", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(date);
+    const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((x) => x.type === type)?.value || "";
+    return `${part("year")}-${part("month")}-${part("day")}`;
+  };
+  const today = dateKey(),
     done =
       user?.lastCheckinAt &&
-      new Date(user.lastCheckinAt).toISOString().slice(0, 10) === today;
+      (user.lastCheckinDate || dateKey(new Date(user.lastCheckinAt))) === today;
   async function claim() {
-    const r = await fetch("/api/pht/checkin", { method: "POST" }),
-      d = await r.json();
-    setMsg(r.ok ? `+${d.reward} PHT` : d.error);
-    if (r.ok) setTimeout(() => location.reload(), 700);
+    if (!user || done || claiming) return;
+    const previous = user;
+    const optimisticStreak = Math.min(7, Number(user.checkinStreak || 0) + 1);
+    setClaiming(true);
+    setMsg("+5 PHT · +0.01 PE");
+    onUser({
+      ...user,
+      phtBalance: Number(user.phtBalance || 0) + 5,
+      totalEarnedPht: Number(user.totalEarnedPht || 0) + 5,
+      peBalance: Number(user.peBalance || 0) + 0.01,
+      totalEarnedPe: Number(user.totalEarnedPe || 0) + 0.01,
+      checkinStreak: optimisticStreak,
+      lastCheckinAt: new Date().toISOString(),
+      lastCheckinDate: today,
+    });
+    try {
+      const r = await fetch("/api/pht/checkin", { method: "POST" });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Check-in failed");
+      onUser({
+        ...previous,
+        phtBalance: Number(d.phtBalance),
+        totalEarnedPht: Number(previous.totalEarnedPht || 0) + Number(d.reward || 5),
+        peBalance: Number(d.peBalance),
+        totalEarnedPe: Number(previous.totalEarnedPe || 0) + Number(d.peReward || 0.01),
+        checkinStreak: Number(d.streak),
+        lastCheckinAt: new Date().toISOString(),
+        lastCheckinDate: String(d.checkinDate || today),
+      });
+    } catch (error) {
+      onUser(previous);
+      setMsg(error instanceof Error ? error.message : "Check-in failed");
+    } finally {
+      setClaiming(false);
+    }
   }
   return (
     <div className="card mt-3">
@@ -1453,11 +1605,11 @@ function Checkin({ user, t }: { user: User | null; t: Words }) {
           </p>
         </div>
         <button
-          disabled={!!done}
+          disabled={!!done || claiming}
           onClick={claim}
           className="rounded-xl bg-violet-500 px-3 py-2 text-xs font-bold disabled:opacity-50"
         >
-          {done ? t.claimed : t.claim}
+          {done ? t.claimed : claiming ? "…" : t.claim}
         </button>
       </div>
       {msg && <p className="mt-2 text-xs text-emerald-300">{msg}</p>}
@@ -1478,6 +1630,7 @@ function Checkin({ user, t }: { user: User | null; t: Words }) {
 
 function OffersView({
   jobs,
+  referralCode,
   campaigns,
   loading,
   t,
@@ -1487,6 +1640,7 @@ function OffersView({
   open,
 }: {
   jobs: Job[];
+  referralCode?: string;
   campaigns: Campaign[];
   loading: boolean;
   t: Words;
@@ -1495,17 +1649,106 @@ function OffersView({
   refresh: () => void;
   open: (c: Campaign) => void;
 }) {
+  const [group, setGroup] = useState<"pe" | "cpx" | "offers">("cpx");
   const [q, setQ] = useState("");
   const [selected, setSelected] = useState<Campaign | null>(null);
+  const [cpxSurveys, setCpxSurveys] = useState<CpxSurvey[]>([]);
+  const [cpxLoading, setCpxLoading] = useState(true);
+  const [cpxError, setCpxError] = useState("");
+  const [cpxActiveLink, setCpxActiveLink] = useState("");
+  const [cpxFrameLoaded, setCpxFrameLoaded] = useState(false);
+  const cpxUrl = "";
+  const cpxAvailable = false;
+  const loadCpx = () => {
+    setCpxLoading(true);
+    setCpxError("");
+    fetch("/api/offers/cpx", { cache: "no-store" })
+      .then(async (r) => {
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error || "CPX unavailable");
+        setCpxSurveys(Array.isArray(d.surveys) ? d.surveys : []);
+      })
+      .catch((e) => setCpxError(e instanceof Error ? e.message : "CPX unavailable"))
+      .finally(() => setCpxLoading(false));
+  };
+  useEffect(() => {
+    loadCpx();
+    const timer = window.setInterval(loadCpx, 120_000);
+    return () => window.clearInterval(timer);
+  }, []);
   const list = useMemo(
     () =>
       campaigns.filter((x) => x.name.toLowerCase().includes(q.toLowerCase())),
     [q, campaigns],
   );
   const detail = offerDetailCopy[locale];
+  const taskCopy = ({
+    en: { pe: "Pure Earn", peSub: "In-house tasks", cpx: "Surveys", cpxSub: "CPX Research", offers: "Offers", offersSub: "Multiple networks", noSurvey: "No matching surveys right now. Please check back later.", retry: "Refresh", rating: "ratings", hot: "Featured", cpxTitle: "Surveys for you", cpxDesc: "Choose a matching survey and get rewarded after confirmation.", survey: "Online survey" },
+    vi: { pe: "Pure Earn", peSub: "Nhiệm vụ nội bộ", cpx: "Khảo sát", cpxSub: "CPX Research", offers: "Offers", offersSub: "Nhiều đối tác", noSurvey: "Hiện chưa có khảo sát phù hợp. Vui lòng quay lại sau.", retry: "Tải lại", rating: "đánh giá", hot: "Nổi bật", cpxTitle: "Khảo sát dành cho bạn", cpxDesc: "Chọn khảo sát phù hợp và nhận thưởng sau khi được xác nhận.", survey: "Khảo sát trực tuyến" },
+    zh: { pe: "Pure Earn", peSub: "内部任务", cpx: "调查", cpxSub: "CPX Research", offers: "优惠任务", offersSub: "多个合作网络", noSurvey: "目前没有适合您的调查，请稍后再试。", retry: "刷新", rating: "评价", hot: "热门", cpxTitle: "为您推荐的调查", cpxDesc: "选择适合您的调查，确认后获得奖励。", survey: "在线调查" },
+    es: { pe: "Pure Earn", peSub: "Tareas internas", cpx: "Encuestas", cpxSub: "CPX Research", offers: "Ofertas", offersSub: "Varias redes", noSurvey: "No hay encuestas adecuadas ahora. Inténtalo más tarde.", retry: "Actualizar", rating: "valoraciones", hot: "Destacado", cpxTitle: "Encuestas para ti", cpxDesc: "Elige una encuesta y recibe la recompensa tras la confirmación.", survey: "Encuesta online" },
+  } as const)[locale];
+  const copy = locale === "vi"
+    ? { pe: "Pure Earn", peSub: "Nhiệm vụ nội bộ", cpx: "Khảo sát", cpxSub: "CPX Research", offers: "Offers", offersSub: "Nhiều đối tác", noSurvey: "Hiện chưa có khảo sát phù hợp. Vui lòng quay lại sau.", retry: "Tải lại", minutes: "phút", rating: "đánh giá", start: "Làm ngay", hot: "Nổi bật", cpxTitle: "Khảo sát dành cho bạn", cpxDesc: "Chọn khảo sát phù hợp và nhận thưởng sau khi được xác nhận." }
+    : { pe: "Pure Earn", peSub: "In-house tasks", cpx: "Surveys", cpxSub: "CPX Research", offers: "Offers", offersSub: "Multiple networks", noSurvey: "No matching surveys right now. Please check back later.", retry: "Refresh", minutes: "min", rating: "ratings", start: "Start", hot: "Featured", cpxTitle: "Surveys for you", cpxDesc: "Choose a matching survey and get rewarded after confirmation." };
+  const taskTabs = [...([
+    ["cpx", taskCopy.cpx, taskCopy.cpxSub, cpxSurveys.length],
+    ["offers", taskCopy.offers, taskCopy.offersSub, list.length],
+  ] as const)].sort((a, b) => b[3] - a[3]);
   return (
     <>
       <Heading icon={LayoutGrid} title={t.offers} />
+      <div className="mt-4 grid grid-cols-3 gap-2 rounded-2xl border border-white/10 bg-white/[0.03] p-2">
+        {[...taskTabs, ["pe", taskCopy.pe, taskCopy.peSub, jobs.length] as const].map(([key, label, sub, count]) => (
+          <button key={key} onClick={() => setGroup(key)} className={`rounded-xl px-2 py-2.5 text-left transition ${group === key ? "bg-gradient-to-br from-violet-500 to-fuchsia-500 shadow-lg shadow-violet-950/30" : "hover:bg-white/5"}`}>
+            <span className="flex items-center justify-between gap-1"><b className="truncate text-sm">{label}</b><small className={`rounded-full px-1.5 py-0.5 text-[8px] font-bold ${group === key ? "bg-white/15" : "bg-white/5 text-slate-400"}`}>{count}</small></span><span className={`block truncate text-[9px] ${group === key ? "text-white/80" : "text-slate-500"}`}>{sub}</span>
+          </button>
+        ))}
+      </div>
+      {group === "pe" && <><Title e="PE" n={taskCopy.peSub} />{jobs.length > 0 && <div className="mt-3 space-y-2">{jobs.map((x) => <JobCard key={x._id} x={x} locale={locale} referralCode={referralCode} />)}</div>}</>}
+      {group === "cpx" && <section className="mt-4 overflow-hidden rounded-xl border border-violet-300/20 bg-gradient-to-b from-[#21143b] to-[#171028]">
+        <div className="flex items-center justify-between gap-3 border-b border-white/10 px-3 py-2.5"><div className="min-w-0"><div className="flex items-center gap-2"><span className="text-[9px] font-bold uppercase tracking-[.14em] text-violet-300">CPX</span><h3 className="truncate text-sm font-semibold">{taskCopy.cpxTitle}</h3></div><p className="mt-0.5 truncate text-[10px] text-slate-400">{taskCopy.cpxDesc}</p></div><button onClick={loadCpx} aria-label={taskCopy.retry} className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-white/10 bg-white/5"><RefreshCw size={14} className={cpxLoading ? "animate-spin" : ""} /></button></div>
+        <div className="divide-y divide-white/10 px-2">
+          {cpxLoading && !cpxSurveys.length && <div className="space-y-1 py-2">{[1,2,3].map((x) => <div key={x} className="h-12 animate-pulse rounded-lg bg-white/5" />)}</div>}
+          {cpxSurveys.map((survey, index) => {
+            const reward = Math.max(0, Math.floor(Number(survey.payout) || 0));
+            const rating = Number(survey.statistics_rating_avg ?? survey.quality_score ?? survey.score) || 0;
+            const ratingCount = Number(survey.statistics_rating_count) || 0;
+            const link = survey.href_new || survey.href;
+            return <button type="button" disabled={!link} onClick={() => { if (link) { setCpxFrameLoaded(false); setCpxActiveLink(link); } }} key={`${survey.id || "survey"}-${index}`} className="flex w-full items-center gap-2 px-2 py-2.5 text-left transition hover:bg-white/[0.05] disabled:opacity-40">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-500/15 text-violet-300"><BookOpen size={15} /></div>
+              <div className="min-w-0 flex-1"><div className="flex items-center gap-1.5"><b className="truncate text-xs font-semibold">{locale === "vi" ? "Khảo sát trực tuyến" : "Online survey"}</b>{Boolean(Number(survey.top)) && <span className="rounded bg-amber-300/15 px-1 py-0.5 text-[7px] font-bold uppercase text-amber-300">{copy.hot}</span>}</div>{rating > 0 && <div className="mt-0.5 truncate text-[9px] text-slate-400">★ {rating.toFixed(1)}{ratingCount ? ` · ${ratingCount} ${copy.rating}` : ""}</div>}</div>
+              <div className="shrink-0 text-right"><b className="block whitespace-nowrap text-xs font-bold text-amber-300">+{reward} PHT</b>{companionPe(reward) > 0 && <small className="block text-[8px] font-bold text-violet-300">+{companionPe(reward)} PE</small>}</div><ChevronRight size={14} className="shrink-0 text-cyan-300" />
+            </button>;
+          })}
+          {!cpxLoading && !cpxSurveys.length && <div className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-300"><span>{cpxError || copy.noSurvey}</span><button onClick={loadCpx} className="shrink-0 text-xs font-bold text-violet-300">{copy.retry}</button></div>}
+        </div>
+      </section>}
+      {group === "offers" && <><div className="mt-3 flex items-center gap-2 rounded-xl border border-white/10 px-3"><Search size={16} /><input className="min-w-0 flex-1 bg-transparent py-3 text-sm outline-none" value={q} onChange={(e) => setQ(e.target.value)} placeholder={t.search} /><button onClick={refresh}><RefreshCw size={16} className={loading ? "animate-spin" : ""} /></button></div>{accessTradeRestricted ? <div className="mt-5 rounded-2xl border border-cyan-300/15 bg-cyan-300/5 p-4 text-sm leading-6 text-cyan-100">{accessTradeRegionCopy[locale]}</div> : <><Title e="OFFERS" n={`${copy.offers} (${list.length})`} /><div className="space-y-2">{list.map((x) => <OfferCard key={`${x.network || "AT"}-${x.campaign_id}`} x={x} t={t} click={() => setSelected(x)} />)}{!list.length && <Empty text={t.noOffers} />}</div><OfferProofForm t={t} /></>}</>}
+      {cpxActiveLink && <div className="fixed inset-0 z-[90] flex flex-col bg-[#130d24]">
+        <div className="flex min-h-14 shrink-0 items-center justify-between gap-3 border-b border-white/10 bg-gradient-to-r from-[#24143f] via-[#1d1835] to-[#102d35] px-3 py-2 shadow-lg">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <Image src="/pht-logo.png" alt="Pure Earn" width={30} height={30} className="h-8 w-8 rounded-lg" />
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 text-xs font-extrabold"><span className="truncate">PURE EARN</span><span className="text-violet-300">×</span><span className="truncate text-emerald-300">CPX RESEARCH</span></div>
+              <div className="mt-0.5 flex items-center gap-1 text-[9px] text-slate-300"><ShieldCheck size={10} className="text-emerald-300" /><span>{locale === "vi" ? "Khảo sát bảo mật từ đối tác CPX" : "Secure survey powered by CPX"}</span></div>
+            </div>
+          </div>
+          <button onClick={() => { setCpxActiveLink(""); setCpxFrameLoaded(false); loadCpx(); }} className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-white/10 bg-white/5 transition hover:bg-white/10" aria-label="Close survey"><X size={18} /></button>
+        </div>
+        <div className="relative min-h-0 flex-1 bg-white">
+          {!cpxFrameLoaded && <div className="absolute inset-0 z-10 grid place-items-center bg-[#f6f7fb] text-[#312645]"><div className="text-center"><RefreshCw size={24} className="mx-auto animate-spin text-violet-600" /><b className="mt-3 block text-sm">CPX Research</b><span className="mt-1 block text-xs text-slate-500">{locale === "vi" ? "Đang mở khảo sát phù hợp…" : "Loading your survey…"}</span></div></div>}
+          <iframe
+            title="CPX Research survey"
+            src={cpxActiveLink}
+            onLoad={() => setCpxFrameLoaded(true)}
+            className="h-full w-full border-0 bg-white"
+            allow="clipboard-write"
+            sandbox="allow-forms allow-scripts allow-same-origin allow-modals allow-storage-access-by-user-activation"
+          />
+        </div>
+      </div>}
+      {false && <>
       <div className="mt-4 flex items-center gap-2 rounded-xl border border-white/10 px-3">
         <Search size={16} />
         <input
@@ -1518,13 +1761,31 @@ function OffersView({
           <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
         </button>
       </div>
+      <Title e="PE" n={locale === "vi" ? "Nhiệm vụ Pure Earn" : "Pure Earn tasks"} />
       <BingXTierOne locale={locale} />
+      {cpxUrl && (
+        <>
+        <Title e="CPX" n={locale === "vi" ? "Đối tác khảo sát" : "Survey partner"} />
+        {!cpxAvailable ? (
+          <div className="mt-3 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-300">
+            Hiện chưa có khảo sát phù hợp. Vui lòng thử lại sau vài giờ.
+          </div>
+        ) : <section className="mt-5 overflow-hidden rounded-2xl border border-violet-300/20 bg-[#171028]">
+          <div className="border-b border-white/10 px-4 py-3">
+            <h3 className="font-bold">CPX Research</h3>
+            <p className="text-xs text-slate-400">Khảo sát quốc tế · Thưởng tự động sau khi được xác nhận</p>
+          </div>
+          <iframe title="CPX Research surveys" src={cpxUrl} className="w-full" style={{ height: 2000, border: 0 }} />
+        </section>}
+        </>
+      )}
       {jobs.length > 0 && (
         <>
-          <Title e="Pure Earn" n={t.minijobs} />
+          <Title e="PE" n={locale === "vi" ? "Nhiệm vụ Pure Earn" : "Pure Earn tasks"} />
+          <Title e="PE" n={t.minijobs} />
           <div className="space-y-2">
             {jobs.map((x) => (
-              <JobCard key={x._id} x={x} />
+              <JobCard key={x._id} x={x} locale={locale} referralCode={referralCode} />
             ))}
           </div>
         </>
@@ -1535,7 +1796,7 @@ function OffersView({
         </div>
       ) : (
         <>
-          <Title e={t.verifiedGroup} n={`${t.partner} (${list.length})`} />
+          <Title e="AT" n={locale === "vi" ? `Offers đối tác (${list.length})` : `Partner offers (${list.length})`} />
           <div className="space-y-2">
             {list.map((x) => (
               <OfferCard
@@ -1550,6 +1811,7 @@ function OffersView({
           <OfferProofForm t={t} />
         </>
       )}
+      </>}
       {selected && (
         <div
           className="fixed inset-0 z-[70] flex items-end justify-center bg-black/70 p-0 backdrop-blur-sm md:items-center md:p-5"
@@ -1569,7 +1831,7 @@ function OffersView({
               )}
               <div className="min-w-0 flex-1">
                 <span className="text-[10px] font-bold uppercase tracking-widest text-cyan-300">
-                  {selected.campaign_type || "Offer"} · AccessTrade
+                  {selected.network || "AT"} · {selected.campaign_type || "Offer"}
                 </span>
                 <h2 className="mt-1 text-xl font-black">{selected.name}</h2>
               </div>
@@ -1581,9 +1843,7 @@ function OffersView({
               <div className="rounded-2xl bg-emerald-400/10 p-3">
                 <small className="text-emerald-200">{detail.estimated}</small>
                 <b className="mt-1 block text-lg text-emerald-300">
-                  {selected.estimated_reward_pht
-                    ? `${selected.estimated_reward_pht.toLocaleString()} PHT`
-                    : detail.validation}
+                  {formatOfferReward(selected, detail.validation)}
                 </b>
               </div>
               <div className="rounded-2xl bg-amber-300/10 p-3">
@@ -1594,12 +1854,13 @@ function OffersView({
               </div>
             </div>
             <p className="mt-4 text-sm leading-6 text-slate-300">
-              {detail.rewardNote}
+              {selected.member_reward_note || detail.rewardNote}
             </p>
             <h3 className="mt-5 font-bold">{detail.howTo}</h3>
             <ol className="mt-3 space-y-3">
-              {detail
-                .steps(selected.name, selected.hold_days || 5)
+              {(selected.custom_instructions && selected.instructions?.length
+                ? selected.instructions
+                : detail.steps(selected.name, selected.hold_days || 5))
                 .map((step, i) => (
                   <li
                     key={i}
@@ -1693,15 +1954,16 @@ function BingXTierOne({ locale }: { locale: Locale }) {
       setProof("");
     }
   }
-  const tiers = config?.tiers;
+  if (!config?.active || !config.affiliateUrl) return null;
+  const tiers = config.tiers;
   return (
-    <section className="mt-4 overflow-hidden rounded-2xl border border-cyan-300/20 bg-gradient-to-br from-[#241744] to-[#102c47] p-4">
+    <section className="mt-4 overflow-hidden rounded-2xl border border-cyan-300/20 bg-gradient-to-br from-[#241744] to-[#102c47] p-3">
       <div className="flex items-start justify-between gap-3">
         <div>
           <span className="rounded-full bg-cyan-300/15 px-2 py-1 text-[10px] font-bold text-cyan-200">
             BINGX · 3 TIERS
           </span>
-          <h3 className="mt-2 text-lg font-black">{c.title}</h3>
+          <h3 className="mt-2 text-base font-black">{c.title}</h3>
         </div>
         {!config?.active && (
           <span className="rounded-full bg-amber-300/10 px-2 py-1 text-[10px] font-bold text-amber-200">
@@ -1709,8 +1971,7 @@ function BingXTierOne({ locale }: { locale: Locale }) {
           </span>
         )}
       </div>
-      <p className="mt-2 text-xs leading-5 text-cyan-50">{c.intro}</p>
-      <div className="mt-4 space-y-2">
+      <div className="mt-3 divide-y divide-white/10 overflow-hidden rounded-xl border border-white/10 bg-black/10">
         {([1, 2, 3] as const).map((tier) => {
           const item = tiers?.[String(tier)];
           const submission = submissions.find((x) => x.tier === tier);
@@ -1732,42 +1993,21 @@ function BingXTierOne({ locale }: { locale: Locale }) {
           return (
             <article
               key={tier}
-              className="rounded-2xl border border-white/10 bg-white/5 p-3"
+              className="bg-white/[0.025]"
             >
-              <div className="flex items-start gap-3">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-500 font-black">
+              <button type="button" onClick={() => setSelectedTier(selectedTier === tier ? null : tier)} className="flex w-full items-center gap-3 px-3 py-3 text-left transition hover:bg-white/5">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-500 font-black">
                   {tier}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <b className="text-sm">{c.names[tier - 1]}</b>
-                  <p className="mt-1 text-[11px] leading-5 text-slate-300">
-                    {c.benefits[tier - 1]}
-                  </p>
-                  {item?.requirement && (
-                    <p className="mt-1 text-[10px] text-cyan-200">
-                      {item.requirement}
-                    </p>
-                  )}
+                  <b className="block truncate text-sm">{c.names[tier - 1]}</b>
                 </div>
                 <b className="whitespace-nowrap text-xs text-amber-300">
                   {item?.rewardPht ? `+${item.rewardPht} PHT` : c.states.soon}
                 </b>
-              </div>
-              {state && (
-                <p className="mt-2 rounded-lg bg-black/15 p-2 text-[11px] text-amber-100">
-                  {state}
-                </p>
-              )}
-              {enabled && (!submission || submission.status === "rejected") && (
-                <button
-                  onClick={() =>
-                    setSelectedTier(selectedTier === tier ? null : tier)
-                  }
-                  className="mt-2 w-full rounded-lg bg-violet-500 p-2 text-xs font-bold"
-                >
-                  {c.submit}
-                </button>
-              )}
+                <ChevronRight size={15} className={`shrink-0 text-slate-400 transition ${selectedTier === tier ? "rotate-90" : ""}`} />
+              </button>
+              {selectedTier === tier && <div className="border-t border-white/10 px-3 pb-3 pt-3"><p className="text-[11px] leading-5 text-slate-300">{c.benefits[tier - 1]}</p>{item?.requirement && <p className="mt-1 text-[10px] text-cyan-200">{item.requirement}</p>}{state && <p className="mt-2 rounded-lg bg-black/15 p-2 text-[11px] text-amber-100">{state}</p>}</div>}
               {selectedTier === tier &&
                 enabled &&
                 (!submission || submission.status === "rejected") && (
@@ -1869,18 +2109,153 @@ function OfferProofForm({ t }: { t: Words }) {
     </details>
   );
 }
-function JobCard({ x }: { x: Job }) {
+function JobCard({ x, locale, referralCode }: { x: Job; locale: Locale; referralCode?: string }) {
+  const identity = `${x.source || ""} ${x.title || ""}`.toLowerCase();
+  const programKey = identity.includes("aro") ? "aro" : identity.includes("okx") ? "okx" : identity.includes("bingx") ? "bingx" : identity.includes("tikluy") ? "tikluy" : "other";
+  const expectedPe = (x.rewardCurrency || "PHT") === "PHT"
+    ? Math.floor(Math.max(0, Number(x.reward || 0)) / 10) / 100
+    : 0;
+  const peNote = locale === "vi"
+    ? `Sau khi được duyệt, nhiệm vụ này cộng thêm ${expectedPe.toFixed(2)} PE. PE là điểm hệ sinh thái, không thể rút.`
+    : locale === "zh"
+      ? `审核通过后，此任务还将增加 ${expectedPe.toFixed(2)} PE。PE 是生态积分，不能提现。`
+      : locale === "es"
+        ? `Tras la aprobación, esta tarea añade ${expectedPe.toFixed(2)} PE. PE es un punto del ecosistema y no se puede retirar.`
+        : `After approval, this task also adds ${expectedPe.toFixed(2)} PE. PE is an ecosystem point and cannot be withdrawn.`;
+  const theme = identity.includes("tikluy")
+    ? {
+        shell: "border-red-300/25 bg-gradient-to-r from-red-500/[0.14] via-orange-400/[0.06] to-white/[0.025] hover:border-red-300/40",
+        icon: "bg-gradient-to-br from-red-400 to-orange-500 text-white shadow-red-500/20",
+        badge: "bg-red-300/10 text-red-100 ring-red-300/15",
+        detail: "border-red-300/15 bg-red-300/[0.035]",
+        button: "bg-gradient-to-r from-red-400 to-orange-400 text-white shadow-red-950/30",
+      }
+    : identity.includes("aro")
+    ? {
+        shell: "border-emerald-300/20 bg-gradient-to-r from-emerald-400/[0.11] via-cyan-400/[0.05] to-white/[0.025] hover:border-emerald-300/35",
+        icon: "bg-gradient-to-br from-emerald-400 to-cyan-500 text-[#082a2a] shadow-emerald-500/20",
+        badge: "bg-emerald-300/10 text-emerald-200 ring-emerald-300/15",
+        detail: "border-emerald-300/15 bg-emerald-300/[0.035]",
+        button: "bg-gradient-to-r from-emerald-400 to-cyan-400 text-[#082321] shadow-emerald-950/30",
+      }
+    : identity.includes("okx")
+      ? {
+          shell: "border-slate-300/20 bg-gradient-to-r from-slate-300/[0.10] via-blue-400/[0.045] to-white/[0.025] hover:border-slate-200/35",
+          icon: "bg-gradient-to-br from-slate-100 to-blue-300 text-[#111827] shadow-blue-500/20",
+          badge: "bg-blue-300/10 text-blue-200 ring-blue-300/15",
+          detail: "border-blue-300/15 bg-blue-300/[0.035]",
+          button: "bg-gradient-to-r from-slate-100 to-blue-300 text-[#111827] shadow-blue-950/30",
+        }
+      : identity.includes("bingx")
+        ? {
+            shell: "border-cyan-300/20 bg-gradient-to-r from-cyan-400/[0.11] via-blue-500/[0.05] to-white/[0.025] hover:border-cyan-300/35",
+            icon: "bg-gradient-to-br from-cyan-300 to-blue-500 text-[#071c36] shadow-cyan-500/20",
+            badge: "bg-cyan-300/10 text-cyan-200 ring-cyan-300/15",
+            detail: "border-cyan-300/15 bg-cyan-300/[0.035]",
+            button: "bg-gradient-to-r from-cyan-300 to-blue-400 text-[#071c36] shadow-cyan-950/30",
+          }
+        : {
+            shell: "border-violet-300/20 bg-gradient-to-r from-violet-500/[0.12] via-fuchsia-400/[0.045] to-white/[0.025] hover:border-violet-300/35",
+            icon: "bg-gradient-to-br from-violet-400 to-fuchsia-500 text-white shadow-violet-500/20",
+            badge: "bg-violet-300/10 text-violet-200 ring-violet-300/15",
+            detail: "border-violet-300/15 bg-violet-300/[0.035]",
+            button: "bg-gradient-to-r from-violet-400 to-fuchsia-500 text-white shadow-violet-950/30",
+          };
+  const copy = ({
+    vi: { internal: "Nhiệm vụ PE", start: "Đăng ký ngay", reward: "Thưởng thêm", benefits: "Quyền lợi chính", steps: "Cách tham gia", note: "Lưu ý" },
+    en: { internal: "PE task", start: "Register now", reward: "Extra reward", benefits: "Main benefits", steps: "How to join", note: "Important" },
+    zh: { internal: "PE 任务", start: "立即注册", reward: "额外奖励", benefits: "主要权益", steps: "参与方式", note: "注意" },
+    es: { internal: "Tarea PE", start: "Registrarse ahora", reward: "Premio adicional", benefits: "Beneficios principales", steps: "Cómo participar", note: "Importante" },
+  } as const)[locale];
+  const tikluyDetails = programKey === "tikluy" && locale === "vi"
+    ? {
+        intro: "Ưu đãi dành riêng cho thành viên Việt Nam từ 20 tuổi. Tikluy công bố quà 30.000đ cho khách hàng mới tải ứng dụng và xác minh eKYC thành công.",
+        benefits: ["Nhập mã giới thiệu 0559287728 để Tikluy ghi nhận lượt tham gia.", "Pure Earn hoàn thêm 600 PHT, tương đương 15.000đ, sau khi kiểm tra thông tin hoàn thành.", "Không cần nạp tiền hoặc tham gia gói đầu tư để hoàn thành nhiệm vụ Pure Earn này."],
+        steps: ["Chọn Google Play nếu dùng Android hoặc App Store nếu dùng iPhone/iPad để cài Tikluy.", "Đăng ký tài khoản mới, nhập mã giới thiệu 0559287728 nếu ứng dụng hiển thị ô mã.", "Hoàn tất eKYC bằng giấy tờ và thông tin chính chủ; lưu ảnh màn hình trạng thái hoàn tất để đối chiếu khi được yêu cầu."],
+        note: "Chỉ áp dụng cho tài khoản Tikluy mới tại Việt Nam từ 20 tuổi. Khoản 30.000đ do Tikluy xét theo thể lệ của họ; 600 PHT là phần hoàn thêm từ Pure Earn sau khi kiểm tra. Không dùng thông tin giả, tài khoản trùng lặp hoặc eKYC hộ người khác.",
+      }
+    : null;
+  const programDetails = tikluyDetails || ({
+    vi: {
+      aro: {
+        intro: "Tham gia hệ sinh thái ARO, tích lũy Jade và chạy node bằng máy tính hoặc điện thoại.",
+        benefits: ["Level I: nhận 2.000 Jade khi tham gia cộng đồng, liên kết tài khoản và chạy node.", "Level II: thêm 2.000 Jade và mở quyền tham gia bảng xếp hạng tổng thưởng 30.000 USDT.", "Mời bạn bè: 500 Jade/ref, 15% F1, 2% F2; người được mời được tăng 20% tốc độ đào."],
+        steps: ["Đăng ký bằng liên kết Pure Earn.", "Tham gia Community và liên kết tài khoản.", "Cài, chạy ARO Node trên PC hoặc Mobile và hoàn thành Level I."],
+        note: "Jade, leaderboard và thưởng giới thiệu do ARO cung cấp theo điều kiện chương trình. 50 PHT là thưởng cộng thêm từ Pure Earn sau khi kiểm tra.",
+      },
+      okx: {
+        intro: "Mở tài khoản OKX mới, hoàn tất xác minh danh tính và tham gia ưu đãi dành cho người dùng đủ điều kiện.",
+        benefits: ["Có cơ hội nhận hộp quà người dùng mới trị giá tối thiểu 5 USDT theo chương trình hiện hành.", "Có thể sử dụng hệ sinh thái giao dịch, ví và các chương trình người dùng mới của OKX.", "Pure Earn thưởng thêm 50 PHT khi đăng ký đúng link và KYC được xác minh."],
+        steps: ["Mở liên kết Pure Earn và tạo tài khoản OKX mới.", "Hoàn tất KYC bằng thông tin chính chủ.", "Kiểm tra mục Rewards/Quà tặng trong OKX và làm đúng điều kiện hiển thị."],
+        note: "Theo thông tin chương trình, quà có thể yêu cầu nạp đủ 10 USDT trước khi rút. Giá trị và điều kiện phụ thuộc khu vực, thời điểm và quy định hiển thị trong OKX.",
+      },
+      bingx: {
+        intro: "Mở tài khoản BingX mới, hoàn tất KYC và nhận quyền tham gia ưu đãi người dùng mới nếu đủ điều kiện.",
+        benefits: ["Có cơ hội nhận Mystery Box trị giá tối thiểu 5 USDT theo chương trình hiện hành.", "Khoản thưởng có thể dùng để trải nghiệm giao dịch theo quy định của BingX.", "Pure Earn thưởng thêm 50 PHT khi đăng ký đúng link và KYC được xác minh."],
+        steps: ["Đăng ký tài khoản BingX mới bằng liên kết Pure Earn.", "Hoàn tất KYC bằng thông tin chính chủ.", "Mở Reward Hub/My Rewards để kiểm tra và nhận hộp quà nếu tài khoản đủ điều kiện."],
+        note: "Mystery Box và điều kiện sử dụng do BingX quyết định theo khu vực và thời điểm. Hãy đọc điều khoản hiển thị trong BingX trước khi nạp hoặc giao dịch.",
+      },
+      other: null,
+    },
+    en: {
+      aro: { intro: "Join the ARO ecosystem, collect Jade and run a node on desktop or mobile.", benefits: ["Level I: earn 2,000 Jade after joining the community, binding your account and running a node.", "Level II: earn another 2,000 Jade and unlock the 30,000 USDT leaderboard.", "Referrals: 500 Jade/ref, 15% F1 and 2% F2; invited users receive a 20% mining-speed boost."], steps: ["Sign up through the Pure Earn link.", "Join the community and bind your account.", "Run ARO Node on desktop or mobile and complete Level I."], note: "ARO provides Jade, leaderboard and referral benefits under its campaign rules. Pure Earn adds 50 PHT after review." },
+      okx: { intro: "Create a new OKX account, complete identity verification and access eligible new-user promotions.", benefits: ["Eligible users may receive a new-user mystery box worth at least 5 USDT.", "Access OKX trading, wallet and new-user programs.", "Pure Earn adds 50 PHT after verified registration and KYC."], steps: ["Create a new account through the Pure Earn link.", "Complete KYC using your own accurate details.", "Check Rewards in OKX and follow the conditions shown there."], note: "The promotion may require a total 10 USDT deposit before withdrawal. Value and conditions depend on region, date and the rules displayed by OKX." },
+      bingx: { intro: "Create a new BingX account, complete KYC and access eligible new-user promotions.", benefits: ["Eligible users may receive a Mystery Box worth at least 5 USDT.", "The reward may be used to experience trading under BingX rules.", "Pure Earn adds 50 PHT after verified registration and KYC."], steps: ["Register through the Pure Earn BingX link.", "Complete KYC using your own accurate details.", "Open Reward Hub/My Rewards to claim an available box."], note: "BingX determines Mystery Box availability and usage by region and campaign period. Review the displayed terms before depositing or trading." },
+      other: null,
+    },
+    zh: {
+      aro: { intro: "加入 ARO 生态，在电脑或手机运行节点并积累 Jade。", benefits: ["Level I：加入社区、绑定账户并运行节点可获得 2,000 Jade。", "Level II：再获得 2,000 Jade，并解锁总奖池 30,000 USDT 的排行榜。", "邀请奖励：每位好友 500 Jade、F1 15%、F2 2%；受邀者挖矿速度提升 20%。"], steps: ["通过 Pure Earn 链接注册。", "加入社区并绑定账户。", "在电脑或手机运行 ARO Node，完成 Level I。"], note: "Jade、排行榜和邀请奖励由 ARO 按活动规则提供。Pure Earn 审核后额外奖励 50 PHT。" },
+      okx: { intro: "注册新的 OKX 账户，完成身份认证并参加符合条件的新用户活动。", benefits: ["符合条件的用户有机会获得价值至少 5 USDT 的新用户礼盒。", "可使用 OKX 交易、钱包及新用户活动。", "通过指定链接注册并完成 KYC，Pure Earn 额外奖励 50 PHT。"], steps: ["通过 Pure Earn 链接创建新的 OKX 账户。", "使用本人真实信息完成 KYC。", "在 OKX 奖励中心查看并完成页面显示的条件。"], note: "活动可能要求累计充值 10 USDT 后才能提现。奖励及条件以地区、时间和 OKX 页面规则为准。" },
+      bingx: { intro: "注册新的 BingX 账户，完成 KYC，并参加符合条件的新用户活动。", benefits: ["符合条件的用户有机会获得价值至少 5 USDT 的神秘礼盒。", "奖励可按 BingX 规则用于体验交易。", "通过指定链接注册并完成 KYC，Pure Earn 额外奖励 50 PHT。"], steps: ["通过 Pure Earn 的 BingX 链接注册。", "使用本人真实信息完成 KYC。", "进入 Reward Hub/My Rewards 查看并领取可用礼盒。"], note: "礼盒资格及使用规则由 BingX 按地区和活动时间决定。充值或交易前请阅读页面条款。" },
+      other: null,
+    },
+    es: {
+      aro: { intro: "Únete al ecosistema ARO, acumula Jade y ejecuta un nodo en PC o móvil.", benefits: ["Nivel I: 2.000 Jade al unirte a la comunidad, vincular la cuenta y ejecutar un nodo.", "Nivel II: otros 2.000 Jade y acceso al ranking de 30.000 USDT.", "Referidos: 500 Jade por amigo, 15% F1 y 2% F2; el invitado recibe 20% más velocidad."], steps: ["Regístrate mediante el enlace de Pure Earn.", "Únete a la comunidad y vincula tu cuenta.", "Ejecuta ARO Node y completa el Nivel I."], note: "ARO ofrece Jade y demás beneficios según sus reglas. Pure Earn añade 50 PHT tras la revisión." },
+      okx: { intro: "Crea una cuenta nueva de OKX, completa KYC y accede a promociones elegibles.", benefits: ["Los usuarios elegibles pueden recibir una caja de al menos 5 USDT.", "Acceso al ecosistema de trading y billetera de OKX.", "Pure Earn añade 50 PHT tras verificar el registro y KYC."], steps: ["Crea una cuenta desde el enlace de Pure Earn.", "Completa KYC con tus datos reales.", "Consulta Recompensas en OKX y cumple las condiciones mostradas."], note: "La promoción puede exigir un depósito total de 10 USDT antes de retirar. Condiciones sujetas a región, fecha y reglas de OKX." },
+      bingx: { intro: "Crea una cuenta nueva de BingX, completa KYC y accede a promociones elegibles.", benefits: ["Los usuarios elegibles pueden recibir una Mystery Box de al menos 5 USDT.", "La recompensa puede usarse según las reglas de BingX.", "Pure Earn añade 50 PHT tras verificar el registro y KYC."], steps: ["Regístrate desde el enlace BingX de Pure Earn.", "Completa KYC con tus datos reales.", "Abre Reward Hub/My Rewards para reclamar una caja disponible."], note: "BingX determina la disponibilidad y condiciones por región y campaña. Revisa los términos antes de depositar o operar." },
+      other: null,
+    },
+  } as const)[locale][programKey === "tikluy" ? "other" : programKey];
+  const sourceLabel = (x.source || x.tags?.[0] || copy.internal).replace(/access\s*trade/gi, "AT");
+  const shareUrl = programKey === "tikluy" && referralCode
+    ? `https://earn.blissbiovn.com/ref/${referralCode}?task=tikluy`
+    : "";
   return (
-    <div className="card flex items-center gap-3">
-      <span className="icon bg-violet-500">{x.icon || "P"}</span>
-      <div className="min-w-0 flex-1">
-        <b className="block truncate text-sm">{x.title}</b>
-        <small className="text-slate-400">{x.tags?.[0] || "Minijob"}</small>
+    <details className={`group overflow-hidden rounded-2xl border transition duration-200 ${theme.shell}`}>
+      <summary className="flex cursor-pointer list-none items-center gap-3 px-3 py-3 transition hover:bg-white/[0.035]">
+        <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-black shadow-lg ring-1 ring-white/20 ${theme.icon}`}>{x.icon || "P"}</span>
+        <span className="min-w-0 flex-1">
+          <b className="block truncate text-sm leading-5 text-white">{x.title}</b>
+          <span className={`mt-1 inline-flex max-w-full rounded-full px-2 py-0.5 text-[8px] font-bold uppercase tracking-[0.12em] ring-1 ${theme.badge}`}><span className="truncate">{sourceLabel}</span></span>
+        </span>
+        <span className="shrink-0 text-right">
+          <b className="block whitespace-nowrap text-xs text-amber-300">+{x.reward} {x.rewardCurrency || "PHT"}</b>
+          {expectedPe > 0 && <small className="block whitespace-nowrap text-[9px] font-bold text-violet-300">+{expectedPe.toFixed(2)} PE</small>}
+          <small className="text-[8px] font-medium uppercase tracking-wider text-slate-500">{copy.reward}</small>
+        </span>
+        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-white/5 ring-1 ring-white/10"><ChevronRight size={14} className="text-slate-300 transition duration-200 group-open:rotate-90" /></span>
+      </summary>
+      <div className={`border-t px-4 py-3 text-xs leading-5 text-slate-300 ${theme.detail}`}>
+        {programDetails ? <>
+          <p className="text-[13px] leading-5 text-slate-200">{programDetails.intro}</p>
+          <h4 className="mt-3 font-black text-white">{copy.benefits}</h4>
+          <ul className="mt-1.5 space-y-1.5">{programDetails.benefits.map((item) => <li key={item} className="flex gap-2"><span className="mt-1 text-emerald-300">✓</span><span>{item}</span></li>)}</ul>
+          <h4 className="mt-3 font-black text-white">{copy.steps}</h4>
+          <ol className="mt-1.5 space-y-1.5">{programDetails.steps.map((item, index) => <li key={item} className="flex gap-2"><span className={`grid h-5 w-5 shrink-0 place-items-center rounded-full text-[9px] font-black ${theme.badge}`}>{index + 1}</span><span>{item}</span></li>)}</ol>
+          <div className="mt-3 rounded-xl border border-amber-300/15 bg-amber-300/[0.06] px-3 py-2 text-[11px] leading-5 text-amber-100"><b>{copy.note}: </b>{programDetails.note}</div>
+          {expectedPe > 0 && <div className="mt-2 rounded-xl border border-violet-300/15 bg-violet-300/[0.06] px-3 py-2 text-[11px] leading-5 text-violet-100"><b>PE: </b>{peNote}</div>}
+        </> : <p>{x.description || x.tags?.[0] || "Pure Earn"}</p>}
+        {programKey === "tikluy" ? (
+          <>
+          {shareUrl && <div className="mt-3 flex items-center gap-2 rounded-xl border border-red-200/15 bg-black/15 p-2"><span className="min-w-0 flex-1 truncate text-[10px] text-red-100">{shareUrl}</span><button type="button" onClick={(event) => { event.preventDefault(); navigator.clipboard.writeText(shareUrl); }} aria-label="Copy Tikluy referral link" className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-white/10 text-white hover:bg-white/15"><Copy size={14} /></button></div>}
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <a href="https://play.google.com/store/apps/details?id=com.tikluy" target="_blank" rel="noreferrer" className={`flex items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-[11px] font-black shadow-lg transition hover:brightness-110 ${theme.button}`}><Smartphone size={15} />Google Play<ExternalLink size={12} /></a>
+            <a href="https://apps.apple.com/vn/app/tikluy/id6504506939" target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/[0.08] px-3 py-2.5 text-[11px] font-black text-white shadow-lg transition hover:bg-white/[0.14]"><Apple size={15} />App Store<ExternalLink size={12} /></a>
+          </div>
+          </>
+        ) : x.externalUrl && <a href={x.externalUrl} target="_blank" rel="noreferrer" className={`mt-3 flex items-center justify-center gap-2 rounded-xl px-3 py-2.5 font-black shadow-lg transition hover:brightness-110 ${theme.button}`}>{copy.start}<ExternalLink size={13} /></a>}
       </div>
-      <b className="text-xs text-amber-300">
-        +{x.reward} {x.rewardCurrency || "PHT"}
-      </b>
-    </div>
+    </details>
   );
 }
 function OfferCard({
@@ -1909,12 +2284,32 @@ function OfferCard({
         </span>
       )}
       <div className="min-w-0 flex-1">
-        <b className="block truncate text-sm">{x.name}</b>
-        <small className="text-slate-400">{t.verified}</small>
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="shrink-0 rounded-md bg-cyan-300/10 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-cyan-300">{x.network || "AT"}</span>
+          <b className="block min-w-0 truncate text-sm">{x.name}</b>
+        </div>
+        <small className="font-bold text-amber-300">
+          {formatOfferReward(x, t.verified)}
+        </small>
       </div>
       <ExternalLink size={15} />
     </button>
   );
+}
+
+function formatOfferReward(x: Campaign, fallback: string) {
+  if (x.variable_reward) {
+    const rate = Number(x.max_commission_rate || x.max_commission || 0);
+    return rate > 0
+      ? `Theo đối soát · HH tối đa ${rate}%`
+      : "Theo hoa hồng thực tế";
+  }
+  const min = Number(x.min_reward_pht || 0);
+  const max = Number(x.max_reward_pht || x.estimated_reward_pht || 0);
+  if (!max) return fallback;
+  if (x.exact_reward || !min || min === max)
+    return `${max.toLocaleString()} PHT · +${companionPe(max)} PE`;
+  return `${min.toLocaleString()}–${max.toLocaleString()} PHT · up to +${companionPe(max)} PE`;
 }
 
 function WalletView({
@@ -1994,6 +2389,12 @@ function WalletView({
     }
   }
   const lv = tier(user?.totalEarnedPht);
+  const walletCopy = ({
+    en: { usd: "USD available", swapHint: "Swap PHT to USD before requesting a payout.", max: "MAX", swap: "SWAP", pe: "PE · Ecosystem Points", peHint: "Earn 1 PE per 1,000 approved task PHT. PE cannot be withdrawn or transferred; future token benefits are not guaranteed.", roadmap: "Tokenomics & roadmap" },
+    vi: { usd: "USD khả dụng", swapHint: "Đổi PHT sang USD trước khi rút tiền.", max: "TỐI ĐA", swap: "ĐỔI", pe: "PE · Điểm hệ sinh thái", peHint: "Nhận 1 PE cho mỗi 1.000 PHT nhiệm vụ được duyệt. PE không thể rút hoặc chuyển nhượng; quyền lợi token tương lai chưa được đảm bảo.", roadmap: "Tokenomics & lộ trình" },
+    zh: { usd: "可用 USD", swapHint: "提现前请先将 PHT 兑换为 USD。", max: "最大", swap: "兑换", pe: "PE · 生态积分", peHint: "每获得 1,000 PHT 已审核任务奖励可获得 1 PE。PE 目前不能提现或转让，未来代币权益不作保证。", roadmap: "代币经济与路线图" },
+    es: { usd: "USD disponible", swapHint: "Convierte PHT a USD antes de solicitar un retiro.", max: "MÁX", swap: "CAMBIAR", pe: "PE · Puntos del ecosistema", peHint: "Gana 1 PE por cada 1.000 PHT de tareas aprobadas. PE no se puede retirar ni transferir; los beneficios futuros del token no están garantizados.", roadmap: "Tokenomics y hoja de ruta" },
+  } as const)[locale];
   return (
     <>
       <Heading icon={WalletCards} title={t.wallet} />
@@ -2008,7 +2409,7 @@ function WalletView({
       <section className="card mt-3 overflow-hidden bg-gradient-to-br from-violet-500/15 to-emerald-400/10">
         <div className="flex items-center justify-between">
           <div>
-            <small className="text-slate-400">USD available</small>
+            <small className="text-slate-400">{walletCopy.usd}</small>
             <b className="block text-2xl text-emerald-300">
               ${Number(user?.usdBalance || 0).toFixed(2)}
             </b>
@@ -2037,15 +2438,23 @@ function WalletView({
             }
             className="rounded-xl bg-white/5 px-3 text-xs"
           >
-            MAX
+            {walletCopy.max}
           </button>
           <button
             onClick={swap}
             className="rounded-xl bg-emerald-400 px-4 text-sm font-black text-[#10251e]"
           >
-            SWAP
+            {walletCopy.swap}
           </button>
         </div>
+      </section>
+      <section className="card mt-3 border border-violet-300/15 bg-violet-400/5">
+        <div className="flex items-center justify-between gap-3">
+          <div><small className="text-violet-300">{walletCopy.pe}</small><b className="mt-1 block text-2xl">{pe(user?.peBalance)}</b></div>
+          <Sparkles className="text-violet-300" />
+        </div>
+        <p className="mt-2 text-[11px] leading-5 text-slate-400">{walletCopy.peHint}</p>
+        <a href="/tokenomics" className="mt-2 inline-block text-xs font-bold text-violet-300 underline">{walletCopy.roadmap}</a>
       </section>
       <section className="card mt-3">
         <b>{t.cashout}</b>
@@ -2076,6 +2485,9 @@ function WalletView({
               className="min-w-0 flex-1 bg-transparent p-3 outline-none"
               placeholder="5.00 USD"
             />
+            <span className="flex items-center border-l border-white/10 px-3 text-xs font-bold text-emerald-300">
+              USD
+            </span>
             <button
               onClick={() =>
                 setAmount(String(Number(user?.usdBalance || 0).toFixed(2)))
@@ -2192,14 +2604,21 @@ function TransactionList({
           <div className="min-w-0 flex-1">
             <b className="block truncate text-sm">{x.source || x.type}</b>
             <small className="text-slate-500">
-              {new Date(x.createdAt).toLocaleDateString(locale)}
+              {x.type === "checkin" && x.metadata?.checkinDate
+                ? new Date(`${x.metadata.checkinDate}T00:00:00`).toLocaleDateString(locale)
+                : new Date(x.createdAt).toLocaleDateString(locale)}
             </small>
           </div>
           <div className="text-right">
             <b className={x.amount < 0 ? "text-red-300" : "text-emerald-300"}>
               {x.amount < 0 ? "-" : "+"}
-              {pht(Math.abs(x.amount))}
+              {x.currency === "USD"
+                ? `$${Math.abs(x.amount).toFixed(2)} USD`
+                : x.currency === "PE"
+                  ? `${Math.abs(x.amount).toFixed(2)} PE`
+                  : pht(Math.abs(x.amount))}
             </b>
+            {x.currency === "PHT" && Number(x.metadata?.peReward || 0) > 0 && <small className="block font-bold text-violet-300">+{Number(x.metadata?.peReward).toFixed(2)} PE</small>}
             <small className="block text-slate-400">
               {statusLabel(locale, x.status)}
             </small>

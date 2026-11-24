@@ -4,11 +4,11 @@ export const REFERRAL_WELCOME_PHT = 100;
 export const REFERRAL_ACTIVATION_PHT = 5000;
 export const USER_SHARE = Math.min(
   0.8,
-  Math.max(0.1, Number(process.env.PHT_USER_SHARE || 0.5)),
+  Math.max(0.1, Number(process.env.PHT_USER_SHARE || 0.4)),
 );
 export const VND_PER_USD = Math.max(
   1,
-  Number(process.env.VND_PER_USD || 24000),
+  Number(process.env.VND_PER_USD || 25000),
 );
 
 export function tierFor(totalEarnedPht: number) {

@@ -23,6 +23,41 @@ export const authOptions: NextAuthOptions = {
         const limited = await rateLimit("login", `${ip}:${login}`, 10, 15 * 60 * 1000);
         if (!limited.allowed) throw new Error("Too many login attempts");
         await connectDB();
+        const adminUsername = String(process.env.ADMIN_USERNAME || "").toLowerCase().trim();
+        const adminPasswordHash = process.env.ADMIN_PASSWORD_HASH_B64
+          ? Buffer.from(process.env.ADMIN_PASSWORD_HASH_B64, "base64").toString("utf8")
+          : String(process.env.ADMIN_PASSWORD_HASH || "");
+        if (adminUsername && login === adminUsername) {
+          const adminEmail = String(process.env.ADMIN_EMAIL || "").toLowerCase().trim();
+          const existingAdmin = adminEmail
+            ? await User.findOne({ email: adminEmail }).select("+passwordHash")
+            : null;
+          const validDatabasePassword = Boolean(
+            existingAdmin?.passwordHash &&
+            (await bcrypt.compare(credentials.password, existingAdmin.passwordHash)),
+          );
+          const validFallbackPassword = Boolean(
+            adminPasswordHash &&
+            (await bcrypt.compare(credentials.password, adminPasswordHash)),
+          );
+          if (!validDatabasePassword && !validFallbackPassword) return null;
+          const adminUser = (existingAdmin || (adminEmail
+            ? await User.findOneAndUpdate(
+                { email: adminEmail },
+                { $set: { role: "admin" }, $setOnInsert: { email: adminEmail, name: "Pure Earn Admin", username: adminUsername, emailVerifiedAt: new Date() } },
+                { new: true, upsert: true },
+              )
+            : null)) as { _id: unknown; email?: string; name?: string; image?: string; role?: string } | null;
+          if (!adminUser) return null;
+          if (adminUser.role !== "admin") await User.updateOne({ _id: adminUser._id }, { $set: { role: "admin" } });
+          return {
+            id: String(adminUser._id),
+            email: adminUser.email,
+            name: adminUser.name || "Pure Earn Admin",
+            image: adminUser.image,
+            role: "admin",
+          } as never;
+        }
         const user = (await User.findOne({
           $or: [{ email: login }, { username: login }],
         }).lean()) as {
@@ -32,9 +67,10 @@ export const authOptions: NextAuthOptions = {
           image?: string;
           passwordHash?: string;
           role?: string;
+          accountStatus?: string;
         } | null;
         if (
-          !user?.passwordHash ||
+          !user?.passwordHash || user.accountStatus === "suspended" ||
           !(await bcrypt.compare(credentials.password, user.passwordHash))
         )
           return null;
@@ -61,7 +97,8 @@ export const authOptions: NextAuthOptions = {
       if (!user.email) return false;
       await connectDB();
       const email = user.email.toLowerCase();
-      const existing = await User.findOne({ email }).select("_id referredBy");
+      const existing = await User.findOne({ email }).select("_id referredBy accountStatus");
+      if (existing?.accountStatus === "suspended") return false;
       const admin = process.env.ADMIN_EMAIL?.toLowerCase() === email;
       const dbUser = await User.findOneAndUpdate(
         { email },
@@ -77,6 +114,8 @@ export const authOptions: NextAuthOptions = {
         { upsert: true, new: true },
       );
       await ensureUserIdentity(dbUser);
+      user.id = String(dbUser._id);
+      (user as typeof user & { role?: string }).role = dbUser.role || "user";
       if (!existing && account?.provider === "google") {
         const referralCode = (await cookies()).get("pureearn_ref")?.value;
         if (referralCode) {
@@ -93,17 +132,28 @@ export const authOptions: NextAuthOptions = {
       }
       return true;
     },
-    async session({ session }) {
-      if (session.user?.email) {
+    async jwt({ token, user }) {
+      if (user) {
+        token.userId = String(user.id || "");
+        token.role = (user as typeof user & { role?: string }).role || "user";
+      }
+      if ((!token.userId || !/^[a-f0-9]{24}$/i.test(String(token.userId))) && token.email) {
         await connectDB();
-        const dbUser = (await User.findOne({
-          email: session.user.email.toLowerCase(),
-        }).lean()) as { _id: unknown; role?: string } | null;
-        if (dbUser) {
-          session.user.id = String(dbUser._id);
-          (session.user as typeof session.user & { role?: string }).role =
-            dbUser.role;
+        const dbUser = (await User.findOne({ email: String(token.email).toLowerCase() })
+          .select("_id role")
+          .lean()) as { _id?: unknown; role?: string } | null;
+        if (dbUser?._id) {
+          token.userId = String(dbUser._id);
+          token.role = dbUser.role || "user";
         }
+      }
+      return token;
+    },
+    async session({ session, token }) {
+      if (session.user) {
+        session.user.id = String(token.userId || token.sub || "");
+        (session.user as typeof session.user & { role?: string }).role =
+          String(token.role || "user");
       }
       return session;
     },

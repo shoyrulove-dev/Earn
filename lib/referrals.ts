@@ -215,6 +215,34 @@ async function releaseReferralMilestones(userId: unknown, referrerId: unknown) {
     },
     { $group: { _id: null, total: { $sum: "$amount" } } },
   ]);
+  const approvedTaskCount = await Transaction.countDocuments({
+    userId,
+    type: "earning",
+    currency: "PHT",
+    status: "approved",
+    amount: { $gt: 0 },
+  });
+  if (approvedTaskCount >= 2) {
+    const peReference = `referral:pe-activation:${userId}`;
+    try {
+      await Transaction.create({
+        userId: referrerId,
+        type: "referral",
+        currency: "PE",
+        amount: 0.1,
+        status: "approved",
+        source: "referral-pe-activation",
+        reference: peReference,
+        metadata: { fromUserId: userId, approvedTasksRequired: 2 },
+      });
+      await Promise.all([
+        User.findByIdAndUpdate(referrerId, { $inc: { peBalance: 0.1, totalEarnedPe: 0.1 } }),
+        User.findByIdAndUpdate(userId, { $set: { referralPePaidAt: new Date() } }),
+      ]);
+    } catch (error) {
+      if ((error as { code?: number }).code !== 11000) throw error;
+    }
+  }
   if (Number(earned[0]?.total || 0) < REFERRAL_ACTIVATION_PHT) return;
   const marked = await User.findOneAndUpdate(
     { _id: userId, activationBonusPaidAt: { $exists: false } },

@@ -1,0 +1,41 @@
+import { NextResponse } from "next/server";
+import crypto from "node:crypto";
+import { getAuthSession } from "@/lib/auth";
+import { connectDB } from "@/lib/mongodb";
+import User from "@/models/User";
+import { cpxClientIp } from "@/lib/cpx";
+
+export async function GET(request: Request) {
+  const session = await getAuthSession();
+  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const appId = process.env.CPX_APP_ID;
+  const secret = process.env.CPX_SECURE_HASH;
+  if (!appId || !secret) return NextResponse.json({ error: "CPX is not configured" }, { status: 503 });
+  await connectDB();
+  const user = (await User.findById(session.user.id).select("userId name email").lean()) as { userId?: string; name?: string; email?: string } | null;
+  if (!user?.userId) return NextResponse.json({ error: "Member ID is not ready" }, { status: 409 });
+  const extUserId = String(user.userId);
+  const clientIp = cpxClientIp(request);
+  if (!clientIp) return NextResponse.json({ error: "Unable to identify a valid client IP" }, { status: 400 });
+  const hash = crypto.createHash("md5").update(`${extUserId}-${secret}`).digest("hex");
+  const url = new URL("https://offers.cpx-research.com/index.php");
+  url.searchParams.set("app_id", appId);
+  url.searchParams.set("ext_user_id", extUserId);
+  url.searchParams.set("secure_hash", hash);
+  if (user.name) url.searchParams.set("username", String(user.name));
+  if (user.email) url.searchParams.set("email", String(user.email));
+  const apiUrl = new URL("https://live-api.cpx-research.com/api/get-surveys.php");
+  apiUrl.searchParams.set("app_id", appId);
+  apiUrl.searchParams.set("ext_user_id", extUserId);
+  apiUrl.searchParams.set("output_method", "api");
+  apiUrl.searchParams.set("ip_user", clientIp);
+  apiUrl.searchParams.set("subid_1", "pureearn");
+  apiUrl.searchParams.set("subid_2", "web");
+  apiUrl.searchParams.set("user_agent", request.headers.get("user-agent") || "");
+  apiUrl.searchParams.set("limit", "12");
+  apiUrl.searchParams.set("secure_hash", hash);
+  const response = await fetch(apiUrl, { cache: "no-store" });
+  const body = await response.json().catch(() => ({}));
+  const surveys = Array.isArray(body) ? body : body.data || body.surveys || [];
+  return NextResponse.json({ ok: true, url: url.toString(), available: response.ok && surveys.length > 0, count: surveys.length, message: body.message_not_found || body.message || null });
+}

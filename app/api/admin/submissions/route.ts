@@ -7,6 +7,7 @@ import User from "@/models/User";
 import Transaction from "@/models/Transaction";
 import { tierFor, vipLevelFor } from "@/lib/pht";
 import { approveReferralForEarning } from "@/lib/referrals";
+import { awardPeForApprovedEarning } from "@/lib/pe";
 export async function GET() {
   const s = await getAuthSession();
   if (s?.user?.role !== "admin")
@@ -113,6 +114,7 @@ export async function PATCH(request: Request) {
         metadata: { submissionId: submission._id },
       });
       await approveReferralForEarning(earning);
+      await awardPeForApprovedEarning(earning._id);
     }
   }
   return NextResponse.json({ submission });

@@ -10,6 +10,7 @@ import {
 import { verifyTotp, requestIp } from "@/lib/security";
 import { writeAudit } from "@/lib/audit";
 import { creditApprovedPht } from "@/lib/balance";
+import { awardPeForApprovedEarning } from "@/lib/pe";
 
 export async function GET() {
   const session = await getAuthSession();
@@ -59,7 +60,10 @@ export async function PATCH(request: Request) {
     const credited = status === "approved" ? await creditApprovedPht(tx.userId, amount) : null;
     if (credited?.debtPaid) tx.set("metadata.debtPaidPht", credited.debtPaid);
     if (credited?.debtPaid) await tx.save();
-    if (status === "approved") await approveReferralForEarning(tx);
+    if (status === "approved") {
+      await approveReferralForEarning(tx);
+      await awardPeForApprovedEarning(tx._id);
+    }
     else await rejectReferralForEarning(tx._id);
   }
   await writeAudit({ actorId: session.user.id, action: `admin.transaction.${status}`, target: String(tx._id), ip: requestIp(request), userAgent: request.headers.get("user-agent") || undefined, metadata: { amount, type: tx.type, userId: String(tx.userId) } });

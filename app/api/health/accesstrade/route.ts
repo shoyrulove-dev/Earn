@@ -10,7 +10,8 @@ export async function GET() {
   try {
     const payload = await getAccessTradeCampaigns();
     await connectDB();
-    const cached = await AppSetting.findOne({ key: "accesstrade-offer-audit" }).lean() as { value?: { checkedAt?: string; results?: unknown[] } } | null;
+    const auditKey = "accesstrade-offer-audit";
+    const cached = await AppSetting.findOne({ key: auditKey }).lean() as { value?: { checkedAt?: string; results?: unknown[] } } | null;
     const fresh = cached?.value?.checkedAt && Date.now() - new Date(cached.value.checkedAt).getTime() < 6 * 60 * 60 * 1000;
     let results = fresh ? cached?.value?.results || [] : [];
     if (!fresh) {
@@ -29,12 +30,13 @@ export async function GET() {
           return { campaignId: campaign.campaign_id, name: campaign.name, type: campaign.campaign_type, difficulty, linkOk: false, error: error instanceof Error ? error.message : "Link test failed" };
         }
       }));
-      await AppSetting.findOneAndUpdate({ key: "accesstrade-offer-audit" }, { $set: { value: { checkedAt: new Date().toISOString(), results } } }, { upsert: true });
+      await AppSetting.findOneAndUpdate({ key: auditKey }, { $set: { value: { checkedAt: new Date().toISOString(), results } } }, { upsert: true });
     }
     return NextResponse.json({
       ok: true,
       configured: true,
       approvedCampaigns: payload.data.length,
+      approved: payload.approved,
       totalCampaigns: payload.totalCampaigns,
       approvals: { successful: payload.totalCampaigns },
       checkedAt: fresh ? cached?.value?.checkedAt : new Date().toISOString(),
